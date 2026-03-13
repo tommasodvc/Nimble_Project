@@ -48,10 +48,14 @@
     .player-slot .slot-icon { font-size: 1.4rem; opacity: 0.9; }
     .player-slot .slot-name { font-size: 0.9rem; font-weight: 600; color: rgba(255,255,255,0.95); }
     .player-slot .slot-level { font-size: 0.75rem; color: rgba(255,255,255,0.6); }
-    .player-slot .slot-cards { display: flex; gap: 2px; flex-wrap: wrap; max-width: 160px; justify-content: center; min-height: 24px; }
+    .player-slot .slot-cards { display: flex; gap: 2px; flex-wrap: wrap; max-width: 200px; justify-content: center; min-height: 24px; }
     .player-slot .slot-cards .card { width: 34px; height: 46px; font-size: 0.6rem !important; }
     .player-slot .slot-cards .card .value { font-size: 0.65rem !important; }
     .player-slot .slot-cards .card .seme-symbol { font-size: 0.75rem !important; }
+    .player-slot.nord .slot-cards { max-width: 400px; gap: 4px; }
+    .player-slot.nord .slot-cards .card { width: 50px; height: 70px !important; font-size: 0.75rem !important; }
+    .player-slot.nord .slot-cards .card .value { font-size: 0.9rem !important; }
+    .player-slot.nord .slot-cards .card .seme-symbol { font-size: 1rem !important; }
     .player-slot.est { left: 2%; top: 50%; transform: translateY(-50%); align-items: flex-start; }
     .player-slot.nord { left: 50%; top: 2%; transform: translateX(-50%); align-items: center; }
     .player-slot.ovest { right: 2%; top: 50%; transform: translateY(-50%); align-items: flex-end; }
@@ -108,9 +112,9 @@
     .ai-row select { padding: 0.4rem 0.5rem; font-size: 1rem; border-radius: 6px; min-width: 100px; }
     .debug-row { margin-top: 1rem; color: rgba(255,255,255,0.8); }
     .play-recap {
-      font-size: 0.8rem; color: rgba(255,255,255,0.9); background: rgba(0,0,0,0.2);
-      padding: 0.5rem 0.75rem; border-radius: 6px; margin-bottom: 0.5rem;
-      max-height: 100px; overflow-y: auto;
+      font-size: 0.85rem; color: rgba(255,255,255,0.95); background: rgba(0,0,0,0.25);
+      padding: 0.6rem 0.9rem; border-radius: 8px; margin: 0.5rem 0;
+      max-height: 120px; overflow-y: auto;
     }
     .play-recap .recap-title { font-weight: 600; margin-bottom: 0.3rem; }
     .play-recap .recap-line { margin: 0.2rem 0; }
@@ -209,7 +213,6 @@
         <span class="t2">Team 2: <strong id="score-eo">0</strong> (Scope: <span id="scope-eo">0</span>)</span>
       </div>
       <div class="message" id="message">Connessione...</div>
-      <div id="play-recap" class="play-recap" style="display:none;"></div>
       <div class="game-board">
         <div class="player-slots">
           <div class="player-slot est" id="slot-est">
@@ -245,6 +248,7 @@
         <span class="my-hand-label">La tua mano</span>
         <div class="my-hand" id="my-hand"></div>
       </div>
+      <div id="play-recap" class="play-recap" style="display:none;"></div>
       <div id="hand-over" class="hand-over" style="display:none;"></div>
     </div>
   </div>
@@ -271,6 +275,14 @@
   <script>
     const NOMI = {1:'A',2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'F',9:'D',10:'R'};
     const SEMI_SYM = { ori: '♦', coppe: '♥', spade: '♠', bastoni: '♣' };
+    const SEMI_ORDER = { Ori: 0, Coppe: 1, Spade: 2, Bastoni: 3 };
+
+    function sortCards(cards) {
+      return [...(cards || [])].sort((a, b) => {
+        if (a.valore !== b.valore) return a.valore - b.valore;
+        return (SEMI_ORDER[a.seme] ?? 0) - (SEMI_ORDER[b.seme] ?? 0);
+      });
+    }
     const socket = io();
     let targetPoints = 21;
     let carteScoperte = false;
@@ -333,13 +345,16 @@
     function renderTable(cards) {
       const el = document.getElementById('table-cards');
       el.innerHTML = '';
-      (cards || []).forEach(c => el.appendChild(cardEl(c)));
+      sortCards(cards || []).forEach(c => el.appendChild(cardEl(c)));
     }
 
     function renderHand(cards, clickable) {
       const el = document.getElementById('my-hand');
       el.innerHTML = '';
-      (cards || []).forEach((c, i) => {
+      const orig = cards || [];
+      const sorted = sortCards(orig);
+      sorted.forEach((c) => {
+        const i = orig.findIndex(x => x.valore === c.valore && x.seme === c.seme);
         const div = cardEl(c);
         div.classList.add(clickable ? 'clickable' : 'disabled');
         if (clickable) div.onclick = () => playCard(i);
@@ -354,7 +369,7 @@
       const levelEl = document.getElementById(id + '-level');
       if (levelEl) levelEl.textContent = '(' + (level ? level.charAt(0).toUpperCase() + level.slice(1) : 'Medium') + ')';
       if (Array.isArray(handData)) {
-        handData.forEach(c => el.appendChild(cardEl(c, { slotCard: true })));
+        sortCards(handData).forEach(c => el.appendChild(cardEl(c, { slotCard: true })));
       } else if (handData?.count !== undefined) {
         const sp = document.createElement('span');
         sp.style.cssText = 'font-size:0.8rem;color:rgba(255,255,255,0.8);';
@@ -371,12 +386,12 @@
       hist.forEach(p => {
         const v = p.valore;
         if (!byVal[v]) byVal[v] = [];
-        byVal[v].push(p.seme + ' (' + p.giocatore + ')');
+        byVal[v].push(nomiVal[v] + ' di ' + p.seme + ' (' + p.giocatore + ')');
       });
       let html = '<div class="recap-title">Carte giocate</div>';
       [1,2,3,4,5,6,7,8,9,10].forEach(v => {
         if (byVal[v] && byVal[v].length) {
-          html += '<div class="recap-line">' + nomiVal[v] + ': ' + byVal[v].join(', ') + '</div>';
+          html += '<div class="recap-line">' + byVal[v].join('; ') + '</div>';
         }
       });
       el.innerHTML = html;
