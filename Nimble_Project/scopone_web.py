@@ -95,6 +95,11 @@ def run_game_loop(target_points: int = 21, ai_levels: dict | None = None, carte_
     total_prese_eo: list = []
     total_scope_ns = 0
     total_scope_eo = 0
+    total_pt_carte_ns = total_pt_carte_eo = 0
+    total_pt_ori_ns = total_pt_ori_eo = 0
+    total_pt_sb_ns = total_pt_sb_eo = 0
+    total_pt_prim_ns = total_pt_prim_eo = 0
+    total_pt_nap_ns = total_pt_nap_eo = 0
     ai_levels = ai_levels or {g: "medium" for g in ("Est", "Nord", "Ovest")}
 
     while True:
@@ -133,6 +138,7 @@ def run_game_loop(target_points: int = 21, ai_levels: dict | None = None, carte_
                 play_history=play_history,
             ))
 
+            spiegazione = None
             if giocatore == "Sud":
                 # Aspetta scelta carta dall'umano
                 try:
@@ -162,17 +168,23 @@ def run_game_loop(target_points: int = 21, ai_levels: dict | None = None, carte_
                 # Turno AI: ritardo 5 secondi poi gioca
                 time.sleep(AI_DELAY_SEC)
                 level = ai_levels.get(giocatore, "medium")
-                carta, cattura = _ai_move(
+                res = _ai_move(
                     level, mano, tavolo, ultima_giocata_mano,
                     prese_ns, prese_eo, carte_giocate, giocatore,
                 )
+                carta, cattura = res[0], res[1]
+                if len(res) >= 3:
+                    spiegazione = res[2]
 
-            socketio.emit("play", {
+            play_payload = {
                 "player": giocatore,
                 "card": carta_to_dict(carta),
                 "capture": [carta_to_dict(c) for c in cattura] if cattura else None,
                 "scopa": bool(cattura and len(cattura) == len(tavolo) and not ultima_giocata_mano),
-            })
+            }
+            if spiegazione:
+                play_payload["spiegazione"] = spiegazione
+            socketio.emit("play", play_payload)
 
             play_history.append({"giocatore": giocatore, "seme": carta.seme, "valore": carta.valore})
             mano.remove(carta)
@@ -207,6 +219,16 @@ def run_game_loop(target_points: int = 21, ai_levels: dict | None = None, carte_
         pt_mano_eo = pt_carte_eo + pt_ori_eo + pt_sb_eo + pt_prim_eo + scope_eo + pt_nap_eo
         punteggio_ns += pt_mano_ns
         punteggio_eo += pt_mano_eo
+        total_pt_carte_ns += pt_carte_ns
+        total_pt_carte_eo += pt_carte_eo
+        total_pt_ori_ns += pt_ori_ns
+        total_pt_ori_eo += pt_ori_eo
+        total_pt_sb_ns += pt_sb_ns
+        total_pt_sb_eo += pt_sb_eo
+        total_pt_prim_ns += pt_prim_ns
+        total_pt_prim_eo += pt_prim_eo
+        total_pt_nap_ns += pt_nap_ns
+        total_pt_nap_eo += pt_nap_eo
 
         socketio.emit("hand_over", {
             "pt_carte_ns": pt_carte_ns, "pt_carte_eo": pt_carte_eo,
@@ -221,37 +243,32 @@ def run_game_loop(target_points: int = 21, ai_levels: dict | None = None, carte_
 
         if punteggio_ns >= target_points or punteggio_eo >= target_points:
             winner = "NS" if punteggio_ns > punteggio_eo else ("EO" if punteggio_eo > punteggio_ns else "Pareggio")
-            pt_carte_ns, pt_carte_eo = calcola_carte(total_prese_ns, total_prese_eo)
-            pt_ori_ns, pt_ori_eo = calcola_ori(total_prese_ns, total_prese_eo)
-            pt_sb_ns, pt_sb_eo = calcola_settebello(total_prese_ns, total_prese_eo)
-            pt_prim_ns, pt_prim_eo = calcola_primiera(total_prese_ns, total_prese_eo)
-            pt_nap_ns, pt_nap_eo = calcola_napula_squadre(total_prese_ns, total_prese_eo)
-            ori_ns = sum(1 for c in total_prese_ns if c.seme == "Ori")
-            ori_eo = sum(1 for c in total_prese_eo if c.seme == "Ori")
+            ori_ns_tot = sum(1 for c in total_prese_ns if c.seme == "Ori")
+            ori_eo_tot = sum(1 for c in total_prese_eo if c.seme == "Ori")
             prim1 = _primiera_detail(total_prese_ns)
             prim2 = _primiera_detail(total_prese_eo)
             recap = {
                 "winner": winner,
                 "punteggio_ns": punteggio_ns,
                 "punteggio_eo": punteggio_eo,
-                "team1_cards": [carta_to_dict(c) for c in total_prese_ns],
-                "team2_cards": [carta_to_dict(c) for c in total_prese_eo],
+                "team1_cards": [carta_to_dict(c) for c in prese_ns],
+                "team2_cards": [carta_to_dict(c) for c in prese_eo],
                 "breakdown": {
                     "team1": {
-                        "carte": {"count": len(total_prese_ns), "pt": pt_carte_ns},
-                        "ori": {"count": ori_ns, "pt": pt_ori_ns},
-                        "settebello": pt_sb_ns,
-                        "primiera": {"detail": prim1, "pt": pt_prim_ns},
+                        "carte": {"count": len(total_prese_ns), "pt": total_pt_carte_ns},
+                        "ori": {"count": ori_ns_tot, "pt": total_pt_ori_ns},
+                        "settebello": total_pt_sb_ns,
+                        "primiera": {"detail": prim1, "pt": total_pt_prim_ns},
                         "scope": total_scope_ns,
-                        "napula": pt_nap_ns,
+                        "napula": total_pt_nap_ns,
                     },
                     "team2": {
-                        "carte": {"count": len(total_prese_eo), "pt": pt_carte_eo},
-                        "ori": {"count": ori_eo, "pt": pt_ori_eo},
-                        "settebello": pt_sb_eo,
-                        "primiera": {"detail": prim2, "pt": pt_prim_eo},
+                        "carte": {"count": len(total_prese_eo), "pt": total_pt_carte_eo},
+                        "ori": {"count": ori_eo_tot, "pt": total_pt_ori_eo},
+                        "settebello": total_pt_sb_eo,
+                        "primiera": {"detail": prim2, "pt": total_pt_prim_eo},
                         "scope": total_scope_eo,
-                        "napula": pt_nap_eo,
+                        "napula": total_pt_nap_eo,
                     },
                 },
             }

@@ -210,9 +210,10 @@ def turno_ai_hard(
     prese_eo: list | None = None,
     carte_giocate: int = 0,
     giocatore: str = "",
-) -> tuple[Carta, list[Carta] | None]:
+) -> tuple[Carta, list[Carta] | None, str | None]:
     """
-    Hard: chiama LLM API (OpenAI) per la mossa. Fallback a medium se errore.
+    Hard: chiama LLM API (OpenAI) per la mossa. Ritorna (carta, cattura, spiegazione).
+    Fallback a medium se errore → (carta, cattura, None).
     """
     try:
         import os
@@ -220,7 +221,8 @@ def turno_ai_hard(
         from openai import OpenAI
         client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""))
         if not client.api_key:
-            return turno_ai_medium(mano, tavolo, ultima_mano, prese_ns, prese_eo, carte_giocate)
+            c, k = turno_ai_medium(mano, tavolo, ultima_mano, prese_ns, prese_eo, carte_giocate)
+            return c, k, None
 
         state = {
             "mano": [_carta_repr(c) for c in mano],
@@ -232,7 +234,8 @@ def turno_ai_hard(
         prompt = f"""Sei un esperto di Scopone Scientifico. Stato: {json.dumps(state)}.
 Regole: 1) Match diretto obbligatorio (stesso valore). 2) Senza match diretto, somma valori.
 Devi giocare UNA carta da mano. Se può catturare, indica quali carte del tavolo (o null).
-Rispondi SOLO con JSON: {{"carta": {{"seme":"...","valore":N}}, "cattura": [...] o null}}"""
+Aggiungi "spiegazione": una stringa di 3 righe (separate da \\n) che spiega brevemente la tua mossa in italiano.
+Rispondi SOLO con JSON: {{"carta": {{"seme":"...","valore":N}}, "cattura": [...] o null, "spiegazione": "riga1\\nriga2\\nriga3"}}"""
 
         resp = client.chat.completions.create(
             model="gpt-4o-mini",
@@ -248,7 +251,8 @@ Rispondi SOLO con JSON: {{"carta": {{"seme":"...","valore":N}}, "cattura": [...]
         cd = data.get("carta", {})
         carta = next((c for c in mano if c.seme == cd.get("seme") and c.valore == cd.get("valore")), None)
         if not carta:
-            return turno_ai_medium(mano, tavolo, ultima_mano, prese_ns, prese_eo, carte_giocate)
+            c, k = turno_ai_medium(mano, tavolo, ultima_mano, prese_ns, prese_eo, carte_giocate)
+            return c, k, None
         opts = catture_valide(carta, tavolo)
         cattura = None
         if opts and data.get("cattura"):
@@ -263,9 +267,15 @@ Rispondi SOLO con JSON: {{"carta": {{"seme":"...","valore":N}}, "cattura": [...]
                 cattura = opts[0]
         elif opts:
             cattura = opts[0]
-        return carta, cattura
+        spiegazione = data.get("spiegazione") or ""
+        if isinstance(spiegazione, str) and len(spiegazione.strip()) > 0:
+            pass
+        else:
+            spiegazione = None
+        return carta, cattura, spiegazione
     except Exception:
-        return turno_ai_medium(mano, tavolo, ultima_mano, prese_ns, prese_eo, carte_giocate)
+        c, k = turno_ai_medium(mano, tavolo, ultima_mano, prese_ns, prese_eo, carte_giocate)
+        return c, k, None
 
 
 # --- Risoluzione giocata ---

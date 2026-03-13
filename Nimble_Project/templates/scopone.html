@@ -27,7 +27,7 @@
     .message { text-align: center; color: rgba(255,255,255,0.95); font-size: 1.1rem; margin-bottom: 1rem; min-height: 1.5rem; }
     .message.your-turn { color: var(--gold); font-weight: 600; animation: pulse 1.5s ease-in-out infinite; }
     @keyframes pulse { 50% { opacity: 0.8; } }
-    .game-board { position: relative; flex: 1; min-height: 420px; }
+    .game-board { position: relative; flex: 1; min-height: 420px; overflow: visible; }
     .table-area {
       position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
       width: 60%; max-width: 460px; min-height: 140px;
@@ -52,12 +52,12 @@
     .player-slot .slot-cards .card { width: 34px; height: 46px; font-size: 0.6rem !important; }
     .player-slot .slot-cards .card .value { font-size: 0.65rem !important; }
     .player-slot .slot-cards .card .seme-symbol { font-size: 0.75rem !important; }
-    .player-slot.nord .slot-cards { max-width: 400px; gap: 4px; }
+    .player-slot.nord .slot-cards { max-width: none; width: 100%; gap: 4px; overflow: visible; }
     .player-slot.nord .slot-cards .card { width: 50px; height: 70px !important; font-size: 0.75rem !important; }
     .player-slot.nord .slot-cards .card .value { font-size: 0.9rem !important; }
     .player-slot.nord .slot-cards .card .seme-symbol { font-size: 1rem !important; }
     .player-slot.est { left: 2%; top: 50%; transform: translateY(-50%); align-items: flex-start; }
-    .player-slot.nord { left: 50%; top: 2%; transform: translateX(-50%); align-items: center; }
+    .player-slot.nord { left: 50%; top: 2%; transform: translateX(-50%); align-items: center; width: 90%; max-width: 580px; }
     .player-slot.ovest { right: 2%; top: 50%; transform: translateY(-50%); align-items: flex-end; }
     .player-slot.sud { left: 50%; bottom: 2%; transform: translateX(-50%); align-items: center; }
     .my-hand-area { text-align: center; padding: 0.5rem; }
@@ -134,6 +134,17 @@
     .breakdown-table .t1 { color: #2d7a4a; }
     .breakdown-table .t2 { color: #c45c3e; }
     .game-over-msg { font-size: 1.2rem; color: var(--gold); }
+    .ai-explanation-overlay {
+      position: fixed; inset: 0; z-index: 1000; display: flex; align-items: flex-start; justify-content: center;
+      padding-top: 8rem; pointer-events: none; opacity: 0; transition: opacity 0.3s ease;
+    }
+    .ai-explanation-overlay.visible { opacity: 1; }
+    .ai-explanation-box {
+      background: linear-gradient(145deg, rgba(26,77,46,0.97), rgba(45,122,74,0.97));
+      border: 2px solid var(--gold); border-radius: 12px; padding: 1.2rem 1.5rem; max-width: 420px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4); color: #fff; white-space: pre-line; font-size: 0.95rem; line-height: 1.5;
+    }
+    .ai-explanation-box .label { color: var(--gold); font-weight: 600; margin-bottom: 0.5rem; font-size: 0.85rem; }
     #game-screen { display: none; }
     #game-screen.visible { display: block; }
   </style>
@@ -254,6 +265,9 @@
   </div>
 
   <!-- Capture choice modal -->
+  <div class="ai-explanation-overlay" id="ai-explanation-overlay">
+    <div class="ai-explanation-box"><span class="label">Mossa AI (Hard):</span><span id="ai-explanation-text"></span></div>
+  </div>
   <div class="modal-overlay" id="capture-modal">
     <div class="modal">
       <h3>Scegli quale cattura fare:</h3>
@@ -463,6 +477,12 @@
     socket.on('state', renderState);
 
     socket.on('play', (data) => {
+      if (data.spiegazione) {
+        const overlay = document.getElementById('ai-explanation-overlay');
+        document.getElementById('ai-explanation-text').textContent = data.spiegazione;
+        overlay.classList.add('visible');
+        setTimeout(() => overlay.classList.remove('visible'), 5000);
+      }
       animateCardPlay(data.player, data.card, data.capture, data.scopa, () => {
         if (data.scopa) {
           const msg = document.getElementById('message');
