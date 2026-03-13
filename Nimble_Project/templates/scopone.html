@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scopone Scientifico</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.4/socket.io.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap');
+    :root {
+      --felt: #1a4d2e;
+      --felt-light: #2d7a4a;
+      --gold: #d4af37;
+      --card-bg: #faf8f5;
+      --text: #2c1810;
+      --red: #8b2500;
+      --blue: #1e3a5f;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Source Serif 4', Georgia, serif;
+      background: var(--felt);
+      min-height: 100vh;
+      color: var(--text);
+      overflow-x: hidden;
+    }
+    .app {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 1rem;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    h1 {
+      font-family: 'Cinzel', serif;
+      color: var(--gold);
+      text-align: center;
+      font-size: 1.6rem;
+      margin-bottom: 0.5rem;
+    }
+    .scores {
+      display: flex;
+      justify-content: center;
+      gap: 2rem;
+      margin-bottom: 1rem;
+      background: rgba(0,0,0,0.2);
+      padding: 0.6rem 1.2rem;
+      border-radius: 8px;
+    }
+    .scores span { color: #fff; font-weight: 600; }
+    .scores .ns { color: #7fc8a8; }
+    .scores .eo { color: #ff9f8e; }
+    .message {
+      text-align: center;
+      color: rgba(255,255,255,0.95);
+      font-size: 1.1rem;
+      margin-bottom: 1rem;
+      min-height: 1.5rem;
+    }
+    .message.your-turn { color: var(--gold); font-weight: 600; animation: pulse 1.5s ease-in-out infinite; }
+    @keyframes pulse { 50% { opacity: 0.8; } }
+    .table-area {
+      flex: 1;
+      background: linear-gradient(145deg, var(--felt-light), var(--felt));
+      border: 3px solid rgba(212,175,55,0.4);
+      border-radius: 16px;
+      padding: 1.5rem;
+      min-height: 220px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .table-cards {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+      min-height: 120px;
+      margin: 0.5rem 0;
+    }
+    .played-cards {
+      display: flex;
+      gap: 6px;
+      margin-top: 0.5rem;
+      flex-wrap: wrap;
+      justify-content: center;
+      font-size: 0.8rem;
+      color: rgba(255,255,255,0.7);
+    }
+    .my-hand {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 1.5rem;
+      padding: 1rem;
+      flex-wrap: wrap;
+    }
+    .card {
+      width: 70px;
+      height: 100px;
+      background: var(--card-bg);
+      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+      box-shadow: 2px 2px 6px rgba(0,0,0,0.3);
+      font-size: 0.85rem;
+      user-select: none;
+    }
+    .card:hover { transform: translateY(-6px); box-shadow: 0 6px 14px rgba(0,0,0,0.4); }
+    .card.clickable { cursor: pointer; }
+    .card.disabled { cursor: not-allowed; opacity: 0.6; pointer-events: none; }
+    .card.selected { transform: translateY(-12px); box-shadow: 0 0 0 3px var(--gold); }
+    .card.seme-ori { color: #b8860b; }
+    .card.seme-coppe { color: var(--red); }
+    .card.seme-spade { color: var(--blue); }
+    .card.seme-bastoni { color: #2d5a27; }
+    .card .value { font-weight: 600; font-size: 1rem; }
+    .card .seme { font-size: 0.7rem; }
+    .card.opponent { width: 50px; height: 72px; font-size: 0.7rem; }
+    .opponents {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.5rem;
+      padding: 0 1rem;
+    }
+    .opponent-slot { font-size: 0.85rem; color: rgba(255,255,255,0.8); }
+    .btn {
+      font-family: inherit;
+      padding: 0.5rem 1.5rem;
+      font-size: 1rem;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      background: var(--gold);
+      color: var(--text);
+      font-weight: 600;
+    }
+    .btn:hover { background: #e5c04a; }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .start-row { text-align: center; margin: 1.5rem 0; }
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.visible { display: flex; }
+    .modal {
+      background: var(--card-bg);
+      padding: 1.5rem;
+      border-radius: 12px;
+      max-width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    .modal h3 { margin-bottom: 1rem; }
+    .modal-options { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; }
+    .modal-options .card { cursor: pointer; }
+    .hand-over, .game-over {
+      text-align: center;
+      padding: 1rem;
+      margin: 1rem 0;
+      background: rgba(0,0,0,0.3);
+      border-radius: 8px;
+      color: #fff;
+    }
+    .game-over { font-size: 1.2rem; color: var(--gold); }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <h1>Scopone Scientifico</h1>
+    <div class="scores">
+      <span class="ns">NS: <strong id="score-ns">0</strong> (Scope: <span id="scope-ns">0</span>)</span>
+      <span class="eo">EO: <strong id="score-eo">0</strong> (Scope: <span id="scope-eo">0</span>)</span>
+    </div>
+    <div class="message" id="message">Connessione...</div>
+    <div class="opponents">
+      <span class="opponent-slot">Est: <span id="est-cards">?</span> carte</span>
+      <span class="opponent-slot">Nord: <span id="nord-cards">?</span> carte</span>
+      <span class="opponent-slot">Ovest: <span id="ovest-cards">?</span> carte</span>
+    </div>
+    <div class="table-area">
+      <div style="color:rgba(255,255,255,0.6);font-size:0.9rem;">TAVOLO</div>
+      <div class="table-cards" id="table-cards"></div>
+      <div class="played-cards" id="last-play"></div>
+      <div class="my-hand" id="my-hand"></div>
+    </div>
+    <div class="start-row">
+      <button class="btn" id="btn-start">Avvia partita</button>
+    </div>
+    <div id="hand-over" class="hand-over" style="display:none;"></div>
+    <div id="game-over" class="game-over" style="display:none;"></div>
+  </div>
+
+  <div class="modal-overlay" id="capture-modal">
+    <div class="modal">
+      <h3>Scegli quale cattura fare:</h3>
+      <div class="modal-options" id="capture-options"></div>
+    </div>
+  </div>
+
+  <script>
+    const NOMI = {1:'Asso',2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'F',9:'D',10:'R'};
+    const socket = io();
+    let pendingCaptureOptions = [];
+    let pendingCardIndex = -1;
+
+    function cardEl(c, opts = {}) {
+      const div = document.createElement('div');
+      div.className = 'card seme-' + (c.seme || '').toLowerCase();
+      if (opts.opponent) div.classList.add('opponent');
+      if (opts.clickable) div.classList.add('clickable');
+      if (opts.disabled) div.classList.add('disabled');
+      div.innerHTML = `<span class="value">${NOMI[c.valore]||c.valore}</span><span class="seme">${(c.seme||'')}</span>`;
+      return div;
+    }
+
+    function renderTable(cards) {
+      const el = document.getElementById('table-cards');
+      el.innerHTML = '';
+      (cards || []).forEach(c => el.appendChild(cardEl(c)));
+    }
+
+    function renderHand(cards, clickable) {
+      const el = document.getElementById('my-hand');
+      el.innerHTML = '';
+      (cards || []).forEach((c, i) => {
+        const div = cardEl(c, { clickable });
+        if (clickable) {
+          div.onclick = () => playCard(i);
+        }
+        el.appendChild(div);
+      });
+    }
+
+    function renderState(s) {
+      if (!s) return;
+      document.getElementById('score-ns').textContent = s.punteggio_ns || 0;
+      document.getElementById('score-eo').textContent = s.punteggio_eo || 0;
+      document.getElementById('scope-ns').textContent = s.scope_ns || 0;
+      document.getElementById('scope-eo').textContent = s.scope_eo || 0;
+      document.getElementById('message').textContent = s.message || '';
+      document.getElementById('message').classList.toggle('your-turn', s.is_your_turn);
+      const hands = s.mani || [];
+      if (hands[0] && hands[0].count !== undefined) document.getElementById('est-cards').textContent = hands[0].count;
+      if (hands[1] && hands[1].count !== undefined) document.getElementById('nord-cards').textContent = hands[1].count;
+      if (hands[2] && hands[2].count !== undefined) document.getElementById('ovest-cards').textContent = hands[2].count;
+      renderTable(s.tavolo);
+      const myHand = Array.isArray(hands[3]) ? hands[3] : [];
+      renderHand(myHand, s.is_your_turn);
+    }
+
+    function playCard(idx) {
+      socket.emit('play_card', { card_index: idx });
+    }
+
+    function playCapture(idx) {
+      socket.emit('capture_choice', { capture_index: idx });
+      document.getElementById('capture-modal').classList.remove('visible');
+    }
+
+    socket.on('connected', () => {
+      document.getElementById('message').textContent = 'Connesso. Clicca "Avvia partita" per iniziare.';
+    });
+
+    socket.on('state', renderState);
+
+    socket.on('play', (data) => {
+      const lastPlay = document.getElementById('last-play');
+      const t = `${data.player} gioca ${NOMI[data.card.valore]} di ${data.card.seme}`;
+      const extra = data.capture ? ` → Prende ${data.capture.length} carta/e` : ' → Lascia sul tavolo';
+      const scopa = data.scopa ? ' *** SCOPA! ***' : '';
+      lastPlay.textContent = t + extra + scopa;
+      lastPlay.style.animation = 'none';
+      lastPlay.offsetHeight;
+      lastPlay.style.animation = 'pulse 0.5s ease-out';
+    });
+
+    socket.on('choose_capture', (data) => {
+      pendingCaptureOptions = data.options || [];
+      const container = document.getElementById('capture-options');
+      container.innerHTML = '';
+      pendingCaptureOptions.forEach((opt, i) => {
+        const wrap = document.createElement('div');
+        wrap.style.display = 'flex';
+        opt.forEach(c => wrap.appendChild(cardEl(c)));
+        wrap.style.cursor = 'pointer';
+        wrap.onclick = () => playCapture(i);
+        container.appendChild(wrap);
+      });
+      document.getElementById('capture-modal').classList.add('visible');
+    });
+
+    socket.on('hand_start', (data) => {
+      document.getElementById('hand-over').style.display = 'none';
+      document.getElementById('game-over').style.display = 'none';
+      document.getElementById('last-play').textContent = '';
+    });
+
+    socket.on('hand_over', (data) => {
+      const el = document.getElementById('hand-over');
+      el.innerHTML = `Fine mano: NS ${data.pt_mano_ns} - EO ${data.pt_mano_eo}. Totale: NS ${data.punteggio_ns} - EO ${data.punteggio_eo}`;
+      el.style.display = 'block';
+    });
+
+    socket.on('game_over', (data) => {
+      const el = document.getElementById('game-over');
+      el.innerHTML = `*** ${data.winner === 'NS' ? 'VITTORIA NS' : data.winner === 'EO' ? 'VITTORIA EO' : 'PAREGGIO'} ***`;
+      el.style.display = 'block';
+    });
+
+    document.getElementById('btn-start').onclick = () => {
+      document.getElementById('btn-start').disabled = true;
+      document.getElementById('btn-start').textContent = 'Partita avviata';
+      socket.emit('start_game');
+    };
+  </script>
+</body>
+</html>
