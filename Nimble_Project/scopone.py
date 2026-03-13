@@ -234,13 +234,14 @@ def turno_ai_hard(
         prompt = f"""Sei un esperto di Scopone Scientifico. Stato: {json.dumps(state)}.
 Regole: 1) Match diretto obbligatorio (stesso valore). 2) Senza match diretto, somma valori.
 Devi giocare UNA carta da mano. Se può catturare, indica quali carte del tavolo (o null).
-Aggiungi "spiegazione": una stringa di 3 righe (separate da \\n) che spiega brevemente la tua mossa in italiano.
-Rispondi SOLO con JSON: {{"carta": {{"seme":"...","valore":N}}, "cattura": [...] o null, "spiegazione": "riga1\\nriga2\\nriga3"}}"""
+OBBLIGATORIO: includi sempre "spiegazione" con esattamente 3 righe in italiano (separate da \\n) che spiegano la mossa.
+Esempio: "spiegazione": "Riga1: motivo.\\nRiga2: dettaglio.\\nRiga3: obiettivo."
+Rispondi SOLO con JSON valido: {{"carta": {{"seme":"...","valore":N}}, "cattura": [...] o null, "spiegazione": "riga1\\nriga2\\nriga3"}}"""
 
         resp = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=150,
+            max_tokens=350,
         )
         text = resp.choices[0].message.content.strip()
         if "```json" in text:
@@ -268,10 +269,15 @@ Rispondi SOLO con JSON: {{"carta": {{"seme":"...","valore":N}}, "cattura": [...]
         elif opts:
             cattura = opts[0]
         spiegazione = data.get("spiegazione") or ""
-        if isinstance(spiegazione, str) and len(spiegazione.strip()) > 0:
-            pass
-        else:
-            spiegazione = None
+        if not (isinstance(spiegazione, str) and len(spiegazione.strip()) > 0):
+            # Fallback se l'LLM non fornisce spiegazione
+            nome = NOMI_VALORI.get(carta.valore, str(carta.valore))
+            if cattura:
+                qt = len(cattura)
+                spiegazione = f"Gioco {nome} di {carta.seme} per catturare {qt} carta/e.\nAcquisisco punti e riduco il tavolo."
+            else:
+                spiegazione = f"Gioco {nome} di {carta.seme} sul tavolo.\nNessuna cattura possibile; lascio la carta in gioco."
+            spiegazione = spiegazione.strip()
         return carta, cattura, spiegazione
     except Exception:
         c, k = turno_ai_medium(mano, tavolo, ultima_mano, prese_ns, prese_eo, carte_giocate)
