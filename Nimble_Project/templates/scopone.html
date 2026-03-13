@@ -134,17 +134,13 @@
     .breakdown-table .t1 { color: #2d7a4a; }
     .breakdown-table .t2 { color: #c45c3e; }
     .game-over-msg { font-size: 1.2rem; color: var(--gold); }
-    .ai-explanation-overlay {
-      position: fixed; inset: 0; z-index: 1000; display: flex; align-items: flex-start; justify-content: center;
-      padding-top: 8rem; pointer-events: none; opacity: 0; transition: opacity 0.3s ease;
-    }
-    .ai-explanation-overlay.visible { opacity: 1; }
     .ai-explanation-box {
-      background: linear-gradient(145deg, rgba(26,77,46,0.97), rgba(45,122,74,0.97));
-      border: 2px solid var(--gold); border-radius: 12px; padding: 1.2rem 1.5rem; max-width: 420px;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.4); color: #fff; white-space: pre-line; font-size: 0.95rem; line-height: 1.5;
+      background: rgba(0,0,0,0.25); border: 1px solid rgba(212,175,55,0.4);
+      border-radius: 8px; padding: 0.7rem 1rem; margin: 0.5rem 0;
+      color: rgba(255,255,255,0.95); white-space: pre-line; font-size: 0.9rem; line-height: 1.5;
+      min-height: 3.5em;
     }
-    .ai-explanation-box .label { color: var(--gold); font-weight: 600; margin-bottom: 0.5rem; font-size: 0.85rem; }
+    .ai-explanation-box .label { color: var(--gold); font-weight: 600; margin-bottom: 0.4rem; font-size: 0.8rem; display: block; }
     #game-screen { display: none; }
     #game-screen.visible { display: block; }
   </style>
@@ -224,6 +220,10 @@
         <span class="t2">Team 2: <strong id="score-eo">0</strong> (Scope: <span id="scope-eo">0</span>)</span>
       </div>
       <div class="message" id="message">Connessione...</div>
+      <div class="ai-explanation-box" id="ai-explanation-box">
+        <span class="label">Spiegazione mossa AI (Hard):</span>
+        <span id="ai-explanation-text"></span>
+      </div>
       <div class="game-board">
         <div class="player-slots">
           <div class="player-slot est" id="slot-est">
@@ -265,9 +265,6 @@
   </div>
 
   <!-- Capture choice modal -->
-  <div class="ai-explanation-overlay" id="ai-explanation-overlay">
-    <div class="ai-explanation-box"><span class="label">Mossa AI (Hard):</span><span id="ai-explanation-text"></span></div>
-  </div>
   <div class="modal-overlay" id="capture-modal">
     <div class="modal">
       <h3>Scegli quale cattura fare:</h3>
@@ -478,10 +475,9 @@
 
     socket.on('play', (data) => {
       if (data.spiegazione) {
-        const overlay = document.getElementById('ai-explanation-overlay');
         document.getElementById('ai-explanation-text').textContent = data.spiegazione;
-        overlay.classList.add('visible');
-        setTimeout(() => overlay.classList.remove('visible'), 5000);
+      } else {
+        document.getElementById('ai-explanation-text').textContent = '';
       }
       animateCardPlay(data.player, data.card, data.capture, data.scopa, () => {
         if (data.scopa) {
@@ -507,6 +503,7 @@
 
     socket.on('hand_start', (data) => {
       document.getElementById('hand-over').style.display = 'none';
+      document.getElementById('ai-explanation-text').textContent = '';
       document.getElementById('play-recap').style.display = 'none';
       document.getElementById('message').textContent = data.mano_num ? `Mano ${data.mano_num}` : '';
       if (data.ai_levels) aiLevels = data.ai_levels;
