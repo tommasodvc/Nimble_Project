@@ -1,6 +1,9 @@
 # System
 .DS_Store
 
+# Local tools (e.g. gh CLI)
+Nimble_Project/bin/
+
 # Other projects (this repo focuses on Nimble_Project)
 Cine_Project/
 Nimbus_Project/
