@@ -17,190 +17,155 @@
       --blue: #1e3a5f;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: 'Source Serif 4', Georgia, serif;
-      background: var(--felt);
-      min-height: 100vh;
-      color: var(--text);
-      overflow-x: hidden;
-    }
-    .app {
-      max-width: 1100px;
-      margin: 0 auto;
-      padding: 1rem;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-    }
-    h1 {
-      font-family: 'Cinzel', serif;
-      color: var(--gold);
-      text-align: center;
-      font-size: 1.6rem;
-      margin-bottom: 0.5rem;
-    }
-    .scores {
-      display: flex;
-      justify-content: center;
-      gap: 2rem;
-      margin-bottom: 1rem;
-      background: rgba(0,0,0,0.2);
-      padding: 0.6rem 1.2rem;
-      border-radius: 8px;
-    }
+    body { font-family: 'Source Serif 4', Georgia, serif; background: var(--felt); min-height: 100vh; color: var(--text); overflow-x: hidden; }
+    .app { max-width: 1100px; margin: 0 auto; padding: 1rem; min-height: 100vh; display: flex; flex-direction: column; }
+    h1 { font-family: 'Cinzel', serif; color: var(--gold); text-align: center; font-size: 1.6rem; margin-bottom: 0.5rem; }
+    .scores { display: flex; justify-content: center; gap: 2rem; margin-bottom: 1rem; background: rgba(0,0,0,0.2); padding: 0.6rem 1.2rem; border-radius: 8px; }
     .scores span { color: #fff; font-weight: 600; }
-    .scores .ns { color: #7fc8a8; }
-    .scores .eo { color: #ff9f8e; }
-    .message {
-      text-align: center;
-      color: rgba(255,255,255,0.95);
-      font-size: 1.1rem;
-      margin-bottom: 1rem;
-      min-height: 1.5rem;
-    }
+    .scores .t1 { color: #7fc8a8; }
+    .scores .t2 { color: #ff9f8e; }
+    .message { text-align: center; color: rgba(255,255,255,0.95); font-size: 1.1rem; margin-bottom: 1rem; min-height: 1.5rem; }
     .message.your-turn { color: var(--gold); font-weight: 600; animation: pulse 1.5s ease-in-out infinite; }
     @keyframes pulse { 50% { opacity: 0.8; } }
+    .game-board { position: relative; flex: 1; min-height: 380px; }
     .table-area {
-      flex: 1;
+      position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+      width: 70%; max-width: 500px; min-height: 160px;
       background: linear-gradient(145deg, var(--felt-light), var(--felt));
       border: 3px solid rgba(212,175,55,0.4);
       border-radius: 16px;
-      padding: 1.5rem;
-      min-height: 220px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-    .table-cards {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 8px;
-      min-height: 120px;
-      margin: 0.5rem 0;
-    }
-    .played-cards {
-      display: flex;
-      gap: 6px;
-      margin-top: 0.5rem;
-      flex-wrap: wrap;
-      justify-content: center;
-      font-size: 0.8rem;
-      color: rgba(255,255,255,0.7);
-    }
-    .my-hand {
-      display: flex;
-      justify-content: center;
-      gap: 10px;
-      margin-top: 1.5rem;
       padding: 1rem;
-      flex-wrap: wrap;
-    }
-    .card {
-      width: 70px;
-      height: 100px;
-      background: var(--card-bg);
-      border-radius: 6px;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      cursor: pointer;
-      transition: transform 0.15s, box-shadow 0.15s;
-      box-shadow: 2px 2px 6px rgba(0,0,0,0.3);
-      font-size: 0.85rem;
-      user-select: none;
     }
-    .card:hover { transform: translateY(-6px); box-shadow: 0 6px 14px rgba(0,0,0,0.4); }
+    .table-label { color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-bottom: 0.5rem; }
+    .table-cards { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; min-height: 100px; }
+    .player-slots { position: absolute; width: 100%; height: 100%; pointer-events: none; }
+    .player-slot { position: absolute; display: flex; gap: 4px; justify-content: center; }
+    .player-slot.est { left: 5%; top: 50%; transform: translateY(-50%); flex-direction: row; }
+    .player-slot.nord { left: 50%; top: 5%; transform: translateX(-50%); flex-direction: row; }
+    .player-slot.ovest { right: 5%; top: 50%; transform: translateY(-50%); flex-direction: row; }
+    .player-slot.sud { left: 50%; bottom: 5%; transform: translateX(-50%); flex-direction: row; }
+    .my-hand { display: flex; justify-content: center; gap: 10px; margin-top: 0.5rem; padding: 1rem; flex-wrap: wrap; }
+    .card {
+      width: 70px; height: 100px; background: var(--card-bg); border-radius: 6px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      transition: transform 0.15s, box-shadow 0.15s;
+      box-shadow: 2px 2px 6px rgba(0,0,0,0.3); font-size: 0.85rem; user-select: none;
+    }
     .card.clickable { cursor: pointer; }
-    .card.disabled { cursor: not-allowed; opacity: 0.6; pointer-events: none; }
-    .card.selected { transform: translateY(-12px); box-shadow: 0 0 0 3px var(--gold); }
+    .card.clickable:hover { transform: translateY(-6px); box-shadow: 0 6px 14px rgba(0,0,0,0.4); }
+    .card.disabled { cursor: default; opacity: 0.7; pointer-events: none; }
     .card.seme-ori { color: #b8860b; }
     .card.seme-coppe { color: var(--red); }
     .card.seme-spade { color: var(--blue); }
     .card.seme-bastoni { color: #2d5a27; }
     .card .value { font-weight: 600; font-size: 1rem; }
     .card .seme { font-size: 0.7rem; }
-    .card.opponent { width: 50px; height: 72px; font-size: 0.7rem; }
-    .opponents {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 0.5rem;
-      padding: 0 1rem;
-    }
+    .card.flying { position: fixed; z-index: 200; pointer-events: none; transition: none; }
+    .card.flying.anim { transition: left 0.4s ease-out, top 0.4s ease-out, transform 0.4s ease-out; }
+    .opponents { display: flex; justify-content: space-between; margin-bottom: 0.5rem; padding: 0 1rem; }
     .opponent-slot { font-size: 0.85rem; color: rgba(255,255,255,0.8); }
-    .btn {
-      font-family: inherit;
-      padding: 0.5rem 1.5rem;
-      font-size: 1rem;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      background: var(--gold);
-      color: var(--text);
-      font-weight: 600;
-    }
+    .btn { font-family: inherit; padding: 0.5rem 1.5rem; font-size: 1rem; border: none; border-radius: 8px; cursor: pointer; background: var(--gold); color: var(--text); font-weight: 600; }
     .btn:hover { background: #e5c04a; }
     .btn:disabled { opacity: 0.6; cursor: not-allowed; }
-    .start-row { text-align: center; margin: 1.5rem 0; }
-    .modal-overlay {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.7);
-      z-index: 100;
-      align-items: center;
-      justify-content: center;
-    }
+    .btn-secondary { background: rgba(255,255,255,0.2); color: #fff; }
+    .btn-secondary:hover { background: rgba(255,255,255,0.3); }
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 100; align-items: center; justify-content: center; overflow-y: auto; padding: 1rem; }
     .modal-overlay.visible { display: flex; }
-    .modal {
-      background: var(--card-bg);
-      padding: 1.5rem;
-      border-radius: 12px;
-      max-width: 90%;
-      max-height: 80vh;
-      overflow-y: auto;
-    }
-    .modal h3 { margin-bottom: 1rem; }
+    .modal { background: var(--card-bg); padding: 1.5rem; border-radius: 12px; max-width: 520px; width: 100%; max-height: 90vh; overflow-y: auto; }
+    .modal h3 { margin-bottom: 1rem; color: var(--text); }
     .modal-options { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; }
-    .modal-options .card { cursor: pointer; }
-    .hand-over, .game-over {
-      text-align: center;
-      padding: 1rem;
-      margin: 1rem 0;
-      background: rgba(0,0,0,0.3);
-      border-radius: 8px;
-      color: #fff;
-    }
-    .game-over { font-size: 1.2rem; color: var(--gold); }
+    .start-row { text-align: center; margin: 1rem 0; }
+    .setup-step { text-align: center; padding: 2rem; }
+    .setup-step h2 { color: var(--gold); margin-bottom: 1rem; font-size: 1.3rem; }
+    .setup-step p { color: rgba(255,255,255,0.9); margin-bottom: 1.5rem; }
+    .points-options { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; margin-bottom: 1rem; }
+    .points-options .btn { min-width: 60px; }
+    .custom-points { display: flex; gap: 0.5rem; align-items: center; justify-content: center; margin-top: 0.5rem; }
+    .custom-points input { width: 60px; padding: 0.4rem; font-size: 1rem; border-radius: 6px; border: 1px solid #ccc; }
+    .hand-over, .game-over-msg { text-align: center; padding: 1rem; margin: 1rem 0; background: rgba(0,0,0,0.3); border-radius: 8px; color: #fff; }
+    .recap { margin-top: 1rem; }
+    .recap-section { margin-bottom: 1.5rem; }
+    .recap-section h4 { color: var(--gold); margin-bottom: 0.5rem; font-size: 1.1rem; }
+    .recap-cards { display: flex; flex-wrap: wrap; gap: 6px; margin: 0.5rem 0; }
+    .recap-cards .card { width: 50px; height: 72px; font-size: 0.75rem; }
+    .recap-cards .card .value { font-size: 0.85rem; }
+    .recap-cards .card .seme { font-size: 0.6rem; }
+    .breakdown-table { width: 100%; border-collapse: collapse; font-size: 0.95rem; margin-top: 0.5rem; }
+    .breakdown-table th, .breakdown-table td { padding: 0.4rem 0.5rem; text-align: left; border-bottom: 1px solid #ddd; }
+    .breakdown-table th { color: var(--text); }
+    .breakdown-table .pt { text-align: right; font-weight: 600; }
+    .breakdown-table .t1 { color: #2d7a4a; }
+    .breakdown-table .t2 { color: #c45c3e; }
+    .game-over-msg { font-size: 1.2rem; color: var(--gold); }
+    #game-screen { display: none; }
+    #game-screen.visible { display: block; }
   </style>
 </head>
 <body>
   <div class="app">
     <h1>Scopone Scientifico</h1>
-    <div class="scores">
-      <span class="ns">NS: <strong id="score-ns">0</strong> (Scope: <span id="scope-ns">0</span>)</span>
-      <span class="eo">EO: <strong id="score-eo">0</strong> (Scope: <span id="scope-eo">0</span>)</span>
+
+    <!-- Step 1: Position assignment -->
+    <div id="step-position" class="setup-step">
+      <h2>Assegnazione posizione</h2>
+      <p>Sei <strong>Sud</strong>. Giochi in <strong>Team 1</strong> insieme a Nord, contro <strong>Team 2</strong> (Est + Ovest).</p>
+      <button class="btn" id="btn-next-position">Avanti</button>
     </div>
-    <div class="message" id="message">Connessione...</div>
-    <div class="opponents">
-      <span class="opponent-slot">Est: <span id="est-cards">?</span> carte</span>
-      <span class="opponent-slot">Nord: <span id="nord-cards">?</span> carte</span>
-      <span class="opponent-slot">Ovest: <span id="ovest-cards">?</span> carte</span>
+
+    <!-- Step 2: Points selection -->
+    <div id="step-points" class="setup-step" style="display:none;">
+      <h2>Punti per vincere</h2>
+      <p>Scegli a quanti punti si arriva:</p>
+      <div class="points-options">
+        <button class="btn" data-points="1">1 manche</button>
+        <button class="btn" data-points="11">11</button>
+        <button class="btn" data-points="21">21</button>
+        <button class="btn" data-points="31">31</button>
+      </div>
+      <div class="custom-points">
+        <span style="color:#fff;">Personalizzato:</span>
+        <input type="number" id="custom-points" min="1" max="101" value="21" />
+        <button class="btn btn-secondary" id="btn-custom">Usa</button>
+      </div>
+      <div style="margin-top:1rem;">
+        <button class="btn" id="btn-start-game">Avvia partita</button>
+      </div>
     </div>
-    <div class="table-area">
-      <div style="color:rgba(255,255,255,0.6);font-size:0.9rem;">TAVOLO</div>
-      <div class="table-cards" id="table-cards"></div>
-      <div class="played-cards" id="last-play"></div>
+
+    <!-- Game screen -->
+    <div id="game-screen">
+      <div class="scores">
+        <span class="t1">Team 1: <strong id="score-ns">0</strong> (Scope: <span id="scope-ns">0</span>)</span>
+        <span class="t2">Team 2: <strong id="score-eo">0</strong> (Scope: <span id="scope-eo">0</span>)</span>
+      </div>
+      <div class="message" id="message">Connessione...</div>
+      <div class="opponents">
+        <span class="opponent-slot">Est: <span id="est-cards">?</span> carte</span>
+        <span class="opponent-slot">Nord: <span id="nord-cards">?</span> carte</span>
+        <span class="opponent-slot">Ovest: <span id="ovest-cards">?</span> carte</span>
+      </div>
+      <div class="game-board">
+        <div class="player-slots">
+          <div class="player-slot est" id="slot-est"></div>
+          <div class="player-slot nord" id="slot-nord"></div>
+          <div class="player-slot ovest" id="slot-ovest"></div>
+          <div class="player-slot sud" id="slot-sud"></div>
+        </div>
+        <div class="table-area">
+          <div class="table-label">TAVOLO</div>
+          <div class="table-cards" id="table-cards"></div>
+        </div>
+      </div>
       <div class="my-hand" id="my-hand"></div>
+      <div id="hand-over" class="hand-over" style="display:none;"></div>
     </div>
-    <div class="start-row">
-      <button class="btn" id="btn-start">Avvia partita</button>
-    </div>
-    <div id="hand-over" class="hand-over" style="display:none;"></div>
-    <div id="game-over" class="game-over" style="display:none;"></div>
   </div>
 
+  <!-- Capture choice modal -->
   <div class="modal-overlay" id="capture-modal">
     <div class="modal">
       <h3>Scegli quale cattura fare:</h3>
@@ -208,20 +173,69 @@
     </div>
   </div>
 
+  <!-- Game over recap modal -->
+  <div class="modal-overlay" id="recap-modal">
+    <div class="modal" style="max-width: 700px;">
+      <h3 id="recap-title">Partita conclusa</h3>
+      <div id="recap-content"></div>
+      <div style="text-align:center; margin-top:1rem;">
+        <button class="btn" id="btn-close-recap">Chiudi</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const NOMI = {1:'Asso',2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'F',9:'D',10:'R'};
     const socket = io();
-    let pendingCaptureOptions = [];
-    let pendingCardIndex = -1;
+    let targetPoints = 21;
 
     function cardEl(c, opts = {}) {
       const div = document.createElement('div');
       div.className = 'card seme-' + (c.seme || '').toLowerCase();
-      if (opts.opponent) div.classList.add('opponent');
-      if (opts.clickable) div.classList.add('clickable');
-      if (opts.disabled) div.classList.add('disabled');
+      if (opts.small) div.style.cssText = 'width:50px;height:72px;font-size:0.7rem;';
       div.innerHTML = `<span class="value">${NOMI[c.valore]||c.valore}</span><span class="seme">${(c.seme||'')}</span>`;
       return div;
+    }
+
+    function getPlayOrigin(player) {
+      if (player === 'Sud') {
+        const hand = document.getElementById('my-hand');
+        if (hand && hand.children.length) {
+          const r = hand.getBoundingClientRect();
+          return { x: r.left + r.width/2 - 35, y: r.top + r.height/2 - 50 };
+        }
+      }
+      const slot = document.getElementById('slot-' + player.toLowerCase());
+      if (!slot) return { x: window.innerWidth/2 - 35, y: window.innerHeight/2 - 50 };
+      const r = slot.getBoundingClientRect();
+      return { x: r.left + r.width/2 - 35, y: r.top + r.height/2 - 50 };
+    }
+
+    function getTableCenter() {
+      const tbl = document.querySelector('.table-area');
+      if (!tbl) return { x: window.innerWidth/2 - 35, y: window.innerHeight/2 - 50 };
+      const r = tbl.getBoundingClientRect();
+      return { x: r.left + r.width/2 - 35, y: r.top + r.height/2 - 50 };
+    }
+
+    function animateCardPlay(player, cardData, capture, scopa, onDone) {
+      const from = getPlayOrigin(player);
+      const to = getTableCenter();
+      const fly = document.createElement('div');
+      fly.className = 'card flying seme-' + (cardData.seme||'').toLowerCase();
+      fly.innerHTML = `<span class="value">${NOMI[cardData.valore]||cardData.valore}</span><span class="seme">${cardData.seme||''}</span>`;
+      fly.style.left = from.x + 'px';
+      fly.style.top = from.y + 'px';
+      document.body.appendChild(fly);
+      requestAnimationFrame(() => {
+        fly.classList.add('anim');
+        fly.style.left = to.x + 'px';
+        fly.style.top = to.y + 'px';
+        setTimeout(() => {
+          fly.remove();
+          if (onDone) onDone();
+        }, 420);
+      });
     }
 
     function renderTable(cards) {
@@ -234,26 +248,25 @@
       const el = document.getElementById('my-hand');
       el.innerHTML = '';
       (cards || []).forEach((c, i) => {
-        const div = cardEl(c, { clickable });
-        if (clickable) {
-          div.onclick = () => playCard(i);
-        }
+        const div = cardEl(c);
+        div.classList.add(clickable ? 'clickable' : 'disabled');
+        if (clickable) div.onclick = () => playCard(i);
         el.appendChild(div);
       });
     }
 
     function renderState(s) {
-      if (!s) return;
-      document.getElementById('score-ns').textContent = s.punteggio_ns || 0;
-      document.getElementById('score-eo').textContent = s.punteggio_eo || 0;
-      document.getElementById('scope-ns').textContent = s.scope_ns || 0;
-      document.getElementById('scope-eo').textContent = s.scope_eo || 0;
+      if (!s || !s.tavolo) return;
+      document.getElementById('score-ns').textContent = s.punteggio_ns ?? 0;
+      document.getElementById('score-eo').textContent = s.punteggio_eo ?? 0;
+      document.getElementById('scope-ns').textContent = s.scope_ns ?? 0;
+      document.getElementById('scope-eo').textContent = s.scope_eo ?? 0;
       document.getElementById('message').textContent = s.message || '';
       document.getElementById('message').classList.toggle('your-turn', s.is_your_turn);
       const hands = s.mani || [];
-      if (hands[0] && hands[0].count !== undefined) document.getElementById('est-cards').textContent = hands[0].count;
-      if (hands[1] && hands[1].count !== undefined) document.getElementById('nord-cards').textContent = hands[1].count;
-      if (hands[2] && hands[2].count !== undefined) document.getElementById('ovest-cards').textContent = hands[2].count;
+      if (hands[0]?.count !== undefined) document.getElementById('est-cards').textContent = hands[0].count;
+      if (hands[1]?.count !== undefined) document.getElementById('nord-cards').textContent = hands[1].count;
+      if (hands[2]?.count !== undefined) document.getElementById('ovest-cards').textContent = hands[2].count;
       renderTable(s.tavolo);
       const myHand = Array.isArray(hands[3]) ? hands[3] : [];
       renderHand(myHand, s.is_your_turn);
@@ -268,32 +281,48 @@
       document.getElementById('capture-modal').classList.remove('visible');
     }
 
+    document.getElementById('btn-next-position').onclick = () => {
+      document.getElementById('step-position').style.display = 'none';
+      document.getElementById('step-points').style.display = 'block';
+    };
+
+    document.querySelectorAll('.points-options .btn').forEach(btn => {
+      btn.onclick = () => { targetPoints = parseInt(btn.dataset.points); };
+    });
+    document.getElementById('btn-custom').onclick = () => {
+      const v = parseInt(document.getElementById('custom-points').value);
+      if (!isNaN(v) && v >= 1) targetPoints = Math.min(101, v);
+    };
+
+    document.getElementById('btn-start-game').onclick = () => {
+      document.getElementById('step-points').style.display = 'none';
+      document.getElementById('game-screen').classList.add('visible');
+      socket.emit('start_game', { target_points: targetPoints });
+    };
+
     socket.on('connected', () => {
-      document.getElementById('message').textContent = 'Connesso. Clicca "Avvia partita" per iniziare.';
+      document.getElementById('message').textContent = 'Connesso. Configura e avvia la partita.';
     });
 
     socket.on('state', renderState);
 
     socket.on('play', (data) => {
-      const lastPlay = document.getElementById('last-play');
-      const t = `${data.player} gioca ${NOMI[data.card.valore]} di ${data.card.seme}`;
-      const extra = data.capture ? ` → Prende ${data.capture.length} carta/e` : ' → Lascia sul tavolo';
-      const scopa = data.scopa ? ' *** SCOPA! ***' : '';
-      lastPlay.textContent = t + extra + scopa;
-      lastPlay.style.animation = 'none';
-      lastPlay.offsetHeight;
-      lastPlay.style.animation = 'pulse 0.5s ease-out';
+      animateCardPlay(data.player, data.card, data.capture, data.scopa, () => {
+        if (data.scopa) {
+          const msg = document.getElementById('message');
+          msg.textContent = '*** SCOPA! ***';
+          msg.style.animation = 'pulse 0.5s';
+        }
+      });
     });
 
     socket.on('choose_capture', (data) => {
-      pendingCaptureOptions = data.options || [];
       const container = document.getElementById('capture-options');
       container.innerHTML = '';
-      pendingCaptureOptions.forEach((opt, i) => {
+      (data.options || []).forEach((opt, i) => {
         const wrap = document.createElement('div');
-        wrap.style.display = 'flex';
+        wrap.style.cssText = 'display:flex;gap:4px;cursor:pointer;';
         opt.forEach(c => wrap.appendChild(cardEl(c)));
-        wrap.style.cursor = 'pointer';
         wrap.onclick = () => playCapture(i);
         container.appendChild(wrap);
       });
@@ -302,26 +331,62 @@
 
     socket.on('hand_start', (data) => {
       document.getElementById('hand-over').style.display = 'none';
-      document.getElementById('game-over').style.display = 'none';
-      document.getElementById('last-play').textContent = '';
+      document.getElementById('message').textContent = data.mano_num ? `Mano ${data.mano_num}` : '';
     });
 
     socket.on('hand_over', (data) => {
       const el = document.getElementById('hand-over');
-      el.innerHTML = `Fine mano: NS ${data.pt_mano_ns} - EO ${data.pt_mano_eo}. Totale: NS ${data.punteggio_ns} - EO ${data.punteggio_eo}`;
+      el.innerHTML = `Fine mano: Team 1 ${data.pt_mano_ns} - Team 2 ${data.pt_mano_eo}. Totale: Team 1 ${data.punteggio_ns} - Team 2 ${data.punteggio_eo}`;
       el.style.display = 'block';
     });
 
     socket.on('game_over', (data) => {
-      const el = document.getElementById('game-over');
-      el.innerHTML = `*** ${data.winner === 'NS' ? 'VITTORIA NS' : data.winner === 'EO' ? 'VITTORIA EO' : 'PAREGGIO'} ***`;
-      el.style.display = 'block';
+      const winner = data.winner === 'NS' ? 'Team 1' : (data.winner === 'EO' ? 'Team 2' : 'Pareggio');
+      const b1 = data.breakdown?.team1 || {};
+      const b2 = data.breakdown?.team2 || {};
+      const wrap = document.createElement('div');
+      wrap.innerHTML = `<div class="game-over-msg">*** ${winner.toUpperCase()} ***</div>
+        <p style="color:var(--text);margin:0.5rem 0;">Punteggio finale: Team 1 ${data.punteggio_ns} - Team 2 ${data.punteggio_eo}</p>`;
+      const s1 = document.createElement('div');
+      s1.className = 'recap-section';
+      s1.innerHTML = '<h4>Team 1 - Carte catturate</h4>';
+      const tc1 = document.createElement('div');
+      tc1.className = 'recap-cards';
+      (data.team1_cards || []).forEach(c => tc1.appendChild(cardEl(c, {small: true})));
+      s1.appendChild(tc1);
+      const s2 = document.createElement('div');
+      s2.className = 'recap-section';
+      s2.innerHTML = '<h4>Team 2 - Carte catturate</h4>';
+      const tc2 = document.createElement('div');
+      tc2.className = 'recap-cards';
+      (data.team2_cards || []).forEach(c => tc2.appendChild(cardEl(c, {small: true})));
+      s2.appendChild(tc2);
+      let tbl = '<table class="breakdown-table"><tr><th>Voce</th><th>Team 1</th><th>Team 2</th></tr>';
+      tbl += `<tr><td>Carte (&gt;20 = 1 pt)</td><td class="pt t1">${b1.carte?.count ?? 0} ${(b1.carte?.pt ? '('+b1.carte.pt+' pt)' : '')}</td><td class="pt t2">${b2.carte?.count ?? 0} ${(b2.carte?.pt ? '('+b2.carte.pt+' pt)' : '')}</td></tr>`;
+      tbl += `<tr><td>Ori</td><td class="pt t1">${b1.ori?.count ?? 0} ${(b1.ori?.pt ? '('+b1.ori.pt+' pt)' : '')}</td><td class="pt t2">${b2.ori?.count ?? 0} ${(b2.ori?.pt ? '('+b2.ori.pt+' pt)' : '')}</td></tr>`;
+      tbl += `<tr><td>Settebello</td><td class="pt t1">${b1.settebello ?? 0} pt</td><td class="pt t2">${b2.settebello ?? 0} pt</td></tr>`;
+      tbl += `<tr><td>Primiera</td><td class="pt t1">${b1.primiera?.pt ?? 0} pt</td><td class="pt t2">${b2.primiera?.pt ?? 0} pt</td></tr>`;
+      tbl += `<tr><td>Scope</td><td class="pt t1">${b1.scope ?? 0}</td><td class="pt t2">${b2.scope ?? 0}</td></tr>`;
+      tbl += `<tr><td>Napula</td><td class="pt t1">${b1.napula ?? 0} pt</td><td class="pt t2">${b2.napula ?? 0} pt</td></tr>`;
+      tbl += '</table>';
+      const s3 = document.createElement('div');
+      s3.className = 'recap-section';
+      s3.innerHTML = '<h4>Dettaglio punteggio</h4>' + tbl;
+      const d1 = b1.primiera?.detail || {}, d2 = b2.primiera?.detail || {};
+      const primDet1 = Object.entries(d1).map(([s,v]) => `${s} ${v.valore}→${v.punti}`).join(', ') || '-';
+      const primDet2 = Object.entries(d2).map(([s,v]) => `${s} ${v.valore}→${v.punti}`).join(', ') || '-';
+      s3.innerHTML += `<p style="font-size:0.85rem;color:#666;margin-top:0.5rem;">Primiera Team 1: ${primDet1}<br>Primiera Team 2: ${primDet2}</p>`;
+      wrap.appendChild(s1);
+      wrap.appendChild(s2);
+      wrap.appendChild(s3);
+      document.getElementById('recap-content').innerHTML = '';
+      document.getElementById('recap-content').appendChild(wrap);
+      document.getElementById('recap-title').textContent = winner === 'Pareggio' ? 'Pareggio!' : winner + ' vince!';
+      document.getElementById('recap-modal').classList.add('visible');
     });
 
-    document.getElementById('btn-start').onclick = () => {
-      document.getElementById('btn-start').disabled = true;
-      document.getElementById('btn-start').textContent = 'Partita avviata';
-      socket.emit('start_game');
+    document.getElementById('btn-close-recap').onclick = () => {
+      document.getElementById('recap-modal').classList.remove('visible');
     };
   </script>
 </body>

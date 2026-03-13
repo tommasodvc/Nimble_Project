@@ -18,7 +18,7 @@ from scopone import (
     Carta, crea_mazzo, distribuisci, quale_squadra,
     catture_valide, turno_ai, risolvi_giocata,
     calcola_carte, calcola_ori, calcola_settebello, calcola_primiera, calcola_napula_squadre,
-    GIOCATORI, NOMI_VALORI, SUD_IDX,
+    GIOCATORI, NOMI_VALORI, SUD_IDX, SEMI, VALORI_PREMIERA,
 )
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
@@ -62,11 +62,26 @@ def build_state(tavolo, mani, prese_ns, prese_eo, scope_ns, scope_eo,
     }
 
 
-def run_game_loop():
+def _primiera_detail(prese: list) -> dict:
+    """Dettaglio primiera: per ogni seme il miglior valore."""
+    detail = {}
+    for seme in SEMI:
+        carte = [c for c in prese if c.seme == seme]
+        if carte:
+            best = max(carte, key=lambda c: c.valore_primiera)
+            detail[seme] = {"valore": best.valore, "punti": VALORI_PREMIERA.get(best.valore, 10)}
+    return detail
+
+
+def run_game_loop(target_points: int = 21):
     """Loop principale del gioco, eseguito in un thread separato."""
     punteggio_ns = 0
     punteggio_eo = 0
     mano_num = 1
+    total_prese_ns: list = []
+    total_prese_eo: list = []
+    total_scope_ns = 0
+    total_scope_eo = 0
 
     while True:
         mazzo = crea_mazzo()
@@ -153,6 +168,11 @@ def run_game_loop():
             else:
                 prese_eo.extend(tavolo)
 
+        total_prese_ns.extend(prese_ns)
+        total_prese_eo.extend(prese_eo)
+        total_scope_ns += scope_ns
+        total_scope_eo += scope_eo
+
         pt_carte_ns, pt_carte_eo = calcola_carte(prese_ns, prese_eo)
         pt_ori_ns, pt_ori_eo = calcola_ori(prese_ns, prese_eo)
         pt_sb_ns, pt_sb_eo = calcola_settebello(prese_ns, prese_eo)
@@ -174,9 +194,43 @@ def run_game_loop():
             "punteggio_ns": punteggio_ns, "punteggio_eo": punteggio_eo,
         })
 
-        if punteggio_ns >= 21 or punteggio_eo >= 21:
+        if punteggio_ns >= target_points or punteggio_eo >= target_points:
             winner = "NS" if punteggio_ns > punteggio_eo else ("EO" if punteggio_eo > punteggio_ns else "Pareggio")
-            socketio.emit("game_over", {"winner": winner, "punteggio_ns": punteggio_ns, "punteggio_eo": punteggio_eo})
+            pt_carte_ns, pt_carte_eo = calcola_carte(total_prese_ns, total_prese_eo)
+            pt_ori_ns, pt_ori_eo = calcola_ori(total_prese_ns, total_prese_eo)
+            pt_sb_ns, pt_sb_eo = calcola_settebello(total_prese_ns, total_prese_eo)
+            pt_prim_ns, pt_prim_eo = calcola_primiera(total_prese_ns, total_prese_eo)
+            pt_nap_ns, pt_nap_eo = calcola_napula_squadre(total_prese_ns, total_prese_eo)
+            ori_ns = sum(1 for c in total_prese_ns if c.seme == "Ori")
+            ori_eo = sum(1 for c in total_prese_eo if c.seme == "Ori")
+            prim1 = _primiera_detail(total_prese_ns)
+            prim2 = _primiera_detail(total_prese_eo)
+            recap = {
+                "winner": winner,
+                "punteggio_ns": punteggio_ns,
+                "punteggio_eo": punteggio_eo,
+                "team1_cards": [carta_to_dict(c) for c in total_prese_ns],
+                "team2_cards": [carta_to_dict(c) for c in total_prese_eo],
+                "breakdown": {
+                    "team1": {
+                        "carte": {"count": len(total_prese_ns), "pt": pt_carte_ns},
+                        "ori": {"count": ori_ns, "pt": pt_ori_ns},
+                        "settebello": pt_sb_ns,
+                        "primiera": {"detail": prim1, "pt": pt_prim_ns},
+                        "scope": total_scope_ns,
+                        "napula": pt_nap_ns,
+                    },
+                    "team2": {
+                        "carte": {"count": len(total_prese_eo), "pt": pt_carte_eo},
+                        "ori": {"count": ori_eo, "pt": pt_ori_eo},
+                        "settebello": pt_sb_eo,
+                        "primiera": {"detail": prim2, "pt": pt_prim_eo},
+                        "scope": total_scope_eo,
+                        "napula": pt_nap_eo,
+                    },
+                },
+            }
+            socketio.emit("game_over", recap)
             break
         mano_num += 1
         time.sleep(2)  # Pausa prima della prossima mano
@@ -188,9 +242,19 @@ def handle_connect():
 
 
 @socketio.on("start_game")
-def handle_start():
+def handle_start(data=None):
+    target = 21
+    if data and "target_points" in data:
+        try:
+            target = int(data["target_points"])
+            if target < 1:
+                target = 1
+            if target > 101:
+                target = 101
+        except (ValueError, TypeError):
+            pass
     emit("state", {"message": "Avvio partita..."})
-    Thread(target=run_game_loop, daemon=True).start()
+    Thread(target=run_game_loop, kwargs={"target_points": target}, daemon=True).start()
 
 
 @socketio.on("play_card")
@@ -209,7 +273,8 @@ def index():
 
 
 if __name__ == "__main__":
+    PORT = 5001  # 5000 often in use by AirPlay on macOS
     print("\n*** SCOPONE SCIENTIFICO - Web UI ***")
-    print("Apri http://localhost:5000 nel browser")
+    print(f"Apri http://localhost:{PORT} nel browser")
     print("Clicca su 'Avvia partita' per iniziare\n")
-    socketio.run(app, host="0.0.0.0", port=5000, debug=False)
+    socketio.run(app, host="0.0.0.0", port=PORT, debug=False)
