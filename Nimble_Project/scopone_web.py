@@ -39,16 +39,17 @@ def dict_to_carta(d: dict) -> Carta:
 
 
 def build_state(tavolo, mani, prese_ns, prese_eo, scope_ns, scope_eo,
-                punteggio_ns, punteggio_eo, current_player, message, mano_sud_idx=None):
+                punteggio_ns, punteggio_eo, current_player, message,
+                carte_scoperte: bool = False,
+                play_history: list | None = None):
     """Costruisce lo stato JSON per il frontend."""
     mani_serialized = []
     for i, mano in enumerate(mani):
-        if i == SUD_IDX:
+        if i == SUD_IDX or carte_scoperte:
             mani_serialized.append([carta_to_dict(c) for c in mano])
         else:
-            # Altri giocatori: mostra solo numero di carte
             mani_serialized.append({"count": len(mano)})
-    return {
+    out = {
         "tavolo": [carta_to_dict(c) for c in tavolo],
         "mani": mani_serialized,
         "prese_ns": len(prese_ns),
@@ -61,6 +62,9 @@ def build_state(tavolo, mani, prese_ns, prese_eo, scope_ns, scope_eo,
         "message": message,
         "is_your_turn": current_player == "Sud",
     }
+    if carte_scoperte and play_history:
+        out["play_history"] = play_history
+    return out
 
 
 def _primiera_detail(prese: list) -> dict:
@@ -82,7 +86,7 @@ def _ai_move(level: str, mano, tavolo, ultima_mano, prese_ns, prese_eo, carte_gi
     return turno_ai_medium(mano, tavolo, ultima_mano, prese_ns, prese_eo, carte_giocate)
 
 
-def run_game_loop(target_points: int = 21, ai_levels: dict | None = None):
+def run_game_loop(target_points: int = 21, ai_levels: dict | None = None, carte_scoperte: bool = False):
     """Loop principale del gioco, eseguito in un thread separato."""
     punteggio_ns = 0
     punteggio_eo = 0
@@ -105,8 +109,12 @@ def run_game_loop(target_points: int = 21, ai_levels: dict | None = None):
         giocatore_idx = 0
         carte_giocate = 0
         totale_giocate = 40
+        play_history: list = []
 
-        socketio.emit("hand_start", {"mano_num": mano_num, "punteggio_ns": punteggio_ns, "punteggio_eo": punteggio_eo})
+        socketio.emit("hand_start", {
+            "mano_num": mano_num, "punteggio_ns": punteggio_ns, "punteggio_eo": punteggio_eo,
+            "ai_levels": ai_levels, "carte_scoperte": carte_scoperte,
+        })
 
         while any(mani):
             giocatore = GIOCATORI[giocatore_idx]
@@ -120,7 +128,9 @@ def run_game_loop(target_points: int = 21, ai_levels: dict | None = None):
             socketio.emit("state", build_state(
                 tavolo, mani, prese_ns, prese_eo, scope_ns, scope_eo,
                 punteggio_ns, punteggio_eo, giocatore,
-                f"Turno di {giocatore}"
+                f"Turno di {giocatore}",
+                carte_scoperte=carte_scoperte,
+                play_history=play_history,
             ))
 
             if giocatore == "Sud":
@@ -164,6 +174,7 @@ def run_game_loop(target_points: int = 21, ai_levels: dict | None = None):
                 "scopa": bool(cattura and len(cattura) == len(tavolo) and not ultima_giocata_mano),
             })
 
+            play_history.append({"giocatore": giocatore, "seme": carta.seme, "valore": carta.valore})
             mano.remove(carta)
             tavolo, prese_ns, prese_eo, scope_ns, scope_eo, _ = risolvi_giocata(
                 carta, cattura, tavolo, prese_ns, prese_eo,
@@ -271,8 +282,11 @@ def handle_start(data=None):
                 pass
         if "ai_levels" in data and isinstance(data["ai_levels"], dict):
             ai_levels.update(data["ai_levels"])
+        carte_scoperte = data.get("carte_scoperte", False)
+    else:
+        carte_scoperte = False
     emit("state", {"message": "Avvio partita..."})
-    Thread(target=run_game_loop, kwargs={"target_points": target, "ai_levels": ai_levels}, daemon=True).start()
+    Thread(target=run_game_loop, kwargs={"target_points": target, "ai_levels": ai_levels, "carte_scoperte": carte_scoperte}, daemon=True).start()
 
 
 @socketio.on("play_card")
