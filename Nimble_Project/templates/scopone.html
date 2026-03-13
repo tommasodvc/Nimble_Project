@@ -86,6 +86,10 @@
     .points-options .btn { min-width: 60px; }
     .custom-points { display: flex; gap: 0.5rem; align-items: center; justify-content: center; margin-top: 0.5rem; }
     .custom-points input { width: 60px; padding: 0.4rem; font-size: 1rem; border-radius: 6px; border: 1px solid #ccc; }
+    .ai-levels { text-align: left; max-width: 320px; margin: 0 auto 1rem; }
+    .ai-row { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; }
+    .ai-label { color: #fff; min-width: 140px; }
+    .ai-row select { padding: 0.4rem 0.5rem; font-size: 1rem; border-radius: 6px; min-width: 100px; }
     .hand-over, .game-over-msg { text-align: center; padding: 1rem; margin: 1rem 0; background: rgba(0,0,0,0.3); border-radius: 8px; color: #fff; }
     .recap { margin-top: 1rem; }
     .recap-section { margin-bottom: 1.5rem; }
@@ -131,9 +135,43 @@
         <input type="number" id="custom-points" min="1" max="101" value="21" />
         <button class="btn btn-secondary" id="btn-custom">Usa</button>
       </div>
-      <div style="margin-top:1rem;">
-        <button class="btn" id="btn-start-game">Avvia partita</button>
+      <button class="btn" id="btn-next-points" style="margin-top:1rem;">Avanti</button>
+    </div>
+
+    <!-- Step 3: AI difficulty per opponent -->
+    <div id="step-ai" class="setup-step" style="display:none;">
+      <h2>Difficoltà degli avversari</h2>
+      <p>Scegli il livello di ogni avversario:</p>
+      <div class="ai-levels">
+        <div class="ai-row">
+          <span class="ai-label">Est:</span>
+          <select id="ai-est">
+            <option value="easy">Easy</option>
+            <option value="medium" selected>Medium</option>
+            <option value="hard">Hard</option>
+          </select>
+        </div>
+        <div class="ai-row">
+          <span class="ai-label">Nord (tuo partner):</span>
+          <select id="ai-nord">
+            <option value="easy">Easy</option>
+            <option value="medium" selected>Medium</option>
+            <option value="hard">Hard</option>
+          </select>
+        </div>
+        <div class="ai-row">
+          <span class="ai-label">Ovest:</span>
+          <select id="ai-ovest">
+            <option value="easy">Easy</option>
+            <option value="medium" selected>Medium</option>
+            <option value="hard">Hard</option>
+          </select>
+        </div>
       </div>
+      <p style="font-size:0.9rem;color:rgba(255,255,255,0.7);margin-top:1rem;">
+        Easy: heuristica base. Medium: + Napula, fine mano. Hard: LLM (richiede OPENAI_API_KEY).
+      </p>
+      <button class="btn" id="btn-start-game" style="margin-top:1rem;">Avvia partita</button>
     </div>
 
     <!-- Game screen -->
@@ -286,6 +324,11 @@
       document.getElementById('step-points').style.display = 'block';
     };
 
+    document.getElementById('btn-next-points').onclick = () => {
+      document.getElementById('step-points').style.display = 'none';
+      document.getElementById('step-ai').style.display = 'block';
+    };
+
     document.querySelectorAll('.points-options .btn').forEach(btn => {
       btn.onclick = () => { targetPoints = parseInt(btn.dataset.points); };
     });
@@ -295,9 +338,14 @@
     };
 
     document.getElementById('btn-start-game').onclick = () => {
-      document.getElementById('step-points').style.display = 'none';
+      document.getElementById('step-ai').style.display = 'none';
       document.getElementById('game-screen').classList.add('visible');
-      socket.emit('start_game', { target_points: targetPoints });
+      const aiLevels = {
+        Est: document.getElementById('ai-est').value,
+        Nord: document.getElementById('ai-nord').value,
+        Ovest: document.getElementById('ai-ovest').value,
+      };
+      socket.emit('start_game', { target_points: targetPoints, ai_levels: aiLevels });
     };
 
     socket.on('connected', () => {

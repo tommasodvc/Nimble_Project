@@ -101,37 +101,171 @@ def catture_valide(carta_giocata: Carta, tavolo: list[Carta]) -> list[list[Carta
 
 # --- Turno AI ---
 
-def turno_ai(
+def _valuta_throw(carta: Carta, tavolo: list[Carta]) -> float:
+    """
+    Quanto è bene gettare questa carta (più alto = meglio gettare).
+    Preferisce: bassa primiera, non-Ori, carte che non creano facili catture.
+    """
+    score = 0.0
+    # Tieni 7, 6, Asso (alta primiera); getta Fante, Donna, Re, 2-5
+    score += 22 - carta.valore_primiera
+    # Proteggi Ori (per Ori + Napula)
+    if carta.seme != "Ori":
+        score += 8
+    # Penalizza se gettare crea match diretto per l'avversario
+    valori_tavolo = {c.valore for c in tavolo}
+    if carta.valore in valori_tavolo:
+        score -= 4
+    # Penalizza gettare valori alti che permettono catture multiple (7,6,Asso)
+    if carta.valore in (7, 6, 1) and len(tavolo) >= 2:
+        somma_tavolo = sum(c.valore for c in tavolo)
+        if somma_tavolo + carta.valore in (10, 20, 30):
+            score -= 6
+    return score
+
+
+def turno_ai_easy(
     mano: list[Carta],
     tavolo: list[Carta],
     ultima_mano: bool = False,
 ) -> tuple[Carta, list[Carta] | None]:
     """
-    (i) Se può prendere qualcosa: prende, massimizzando nell'ordine: Scopa, Primiera, Ori.
-    (ii) Se non può prendere nulla: lascia una carta random sul tavolo.
+    Easy: catture base (Scopa > Primiera > Ori), getti intelligenti.
     """
-    # Raccogli tutte le (carta, cattura) valide
     mosse_con_cattura: list[tuple[Carta, list[Carta]]] = []
     for c in mano:
-        opzioni = catture_valide(c, tavolo)
-        for cattura in opzioni:
+        for cattura in catture_valide(c, tavolo):
             mosse_con_cattura.append((c, cattura))
 
     if not mosse_con_cattura:
-        # Non può prendere: lancia una carta random
-        carta = random.choice(mano)
-        return carta, None
+        best = max(mano, key=lambda c: _valuta_throw(c, tavolo))
+        return best, None
 
-    # Massimizza: Scopa > Primiera > Ori
-    def valuta(carta: Carta, cattura: list[Carta]) -> tuple[int, int, int]:
+    def valuta(c: Carta, cattura: list[Carta]) -> tuple[int, int, int]:
         scopa = 1 if (not ultima_mano and len(cattura) == len(tavolo)) else 0
-        totale = [carta] + cattura
+        totale = [c] + cattura
         primiera = sum(x.valore_primiera for x in totale)
         ori = sum(1 for x in totale if x.seme == "Ori")
         return (scopa, primiera, ori)
 
     best = max(mosse_con_cattura, key=lambda m: valuta(m[0], m[1]))
     return best[0], best[1]
+
+
+def turno_ai_medium(
+    mano: list[Carta],
+    tavolo: list[Carta],
+    ultima_mano: bool = False,
+    prese_ns: list | None = None,
+    prese_eo: list | None = None,
+    carte_giocate: int = 0,
+) -> tuple[Carta, list[Carta] | None]:
+    """
+    Medium: come Easy + Napula, awareness fine mano, catture difensive.
+    """
+    prese_ns = prese_ns or []
+    prese_eo = prese_eo or []
+    mosse_con_cattura: list[tuple[Carta, list[Carta]]] = []
+    for c in mano:
+        for cattura in catture_valide(c, tavolo):
+            mosse_con_cattura.append((c, cattura))
+
+    if not mosse_con_cattura:
+        best = max(mano, key=lambda c: _valuta_throw(c, tavolo))
+        return best, None
+
+    def valuta(c: Carta, cattura: list[Carta]) -> tuple[int, int, int, int]:
+        scopa = 1 if (not ultima_mano and len(cattura) == len(tavolo)) else 0
+        totale = [c] + cattura
+        primiera = sum(x.valore_primiera for x in totale)
+        ori = sum(1 for x in totale if x.seme == "Ori")
+        napula_bonus = 0
+        if ori >= 2:
+            ori_vals = [x.valore for x in totale if x.seme == "Ori"]
+            if 1 in ori_vals and 2 in ori_vals:
+                napula_bonus = 2
+            elif 1 in ori_vals or 7 in ori_vals:
+                napula_bonus = 1
+        carte_awareness = 1 if carte_giocate > 30 and (len(prese_ns) + len(prese_eo) + len(tavolo)) > 30 else 0
+        return (scopa, primiera, ori + napula_bonus, carte_awareness)
+
+    best = max(mosse_con_cattura, key=lambda m: valuta(m[0], m[1]))
+    return best[0], best[1]
+
+
+def turno_ai(mano, tavolo, ultima_mano=False, prese_ns=None, prese_eo=None, carte_giocate=0):
+    """Alias per turno_ai_medium (compatibilità)."""
+    return turno_ai_medium(mano, tavolo, ultima_mano, prese_ns, prese_eo, carte_giocate)
+
+
+def _carta_repr(c: Carta) -> dict:
+    return {"seme": c.seme, "valore": c.valore}
+
+
+def turno_ai_hard(
+    mano: list[Carta],
+    tavolo: list[Carta],
+    ultima_mano: bool = False,
+    prese_ns: list | None = None,
+    prese_eo: list | None = None,
+    carte_giocate: int = 0,
+    giocatore: str = "",
+) -> tuple[Carta, list[Carta] | None]:
+    """
+    Hard: chiama LLM API (OpenAI) per la mossa. Fallback a medium se errore.
+    """
+    try:
+        import os
+        import json
+        from openai import OpenAI
+        client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""))
+        if not client.api_key:
+            return turno_ai_medium(mano, tavolo, ultima_mano, prese_ns, prese_eo, carte_giocate)
+
+        state = {
+            "mano": [_carta_repr(c) for c in mano],
+            "tavolo": [_carta_repr(c) for c in tavolo],
+            "prese_ns": len(prese_ns or []),
+            "prese_eo": len(prese_eo or []),
+            "giocatore": giocatore,
+        }
+        prompt = f"""Sei un esperto di Scopone Scientifico. Stato: {json.dumps(state)}.
+Regole: 1) Match diretto obbligatorio (stesso valore). 2) Senza match diretto, somma valori.
+Devi giocare UNA carta da mano. Se può catturare, indica quali carte del tavolo (o null).
+Rispondi SOLO con JSON: {{"carta": {{"seme":"...","valore":N}}, "cattura": [...] o null}}"""
+
+        resp = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=150,
+        )
+        text = resp.choices[0].message.content.strip()
+        if "```json" in text:
+            text = text.split("```json")[1].split("```")[0].strip()
+        elif "```" in text:
+            text = text.split("```")[1].split("```")[0].strip()
+        data = json.loads(text)
+        cd = data.get("carta", {})
+        carta = next((c for c in mano if c.seme == cd.get("seme") and c.valore == cd.get("valore")), None)
+        if not carta:
+            return turno_ai_medium(mano, tavolo, ultima_mano, prese_ns, prese_eo, carte_giocate)
+        opts = catture_valide(carta, tavolo)
+        cattura = None
+        if opts and data.get("cattura"):
+            for opt in opts:
+                if len(opt) == len(data["cattura"]) and all(
+                    any(x.seme == d["seme"] and x.valore == d["valore"] for x in opt)
+                    for d in data["cattura"]
+                ):
+                    cattura = opt
+                    break
+            if not cattura:
+                cattura = opts[0]
+        elif opts:
+            cattura = opts[0]
+        return carta, cattura
+    except Exception:
+        return turno_ai_medium(mano, tavolo, ultima_mano, prese_ns, prese_eo, carte_giocate)
 
 
 # --- Risoluzione giocata ---

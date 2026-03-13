@@ -16,7 +16,8 @@ from flask_socketio import SocketIO, emit
 # Import game logic from scopone
 from scopone import (
     Carta, crea_mazzo, distribuisci, quale_squadra,
-    catture_valide, turno_ai, risolvi_giocata,
+    catture_valide, risolvi_giocata,
+    turno_ai_easy, turno_ai_medium, turno_ai_hard,
     calcola_carte, calcola_ori, calcola_settebello, calcola_primiera, calcola_napula_squadre,
     GIOCATORI, NOMI_VALORI, SUD_IDX, SEMI, VALORI_PREMIERA,
 )
@@ -73,7 +74,15 @@ def _primiera_detail(prese: list) -> dict:
     return detail
 
 
-def run_game_loop(target_points: int = 21):
+def _ai_move(level: str, mano, tavolo, ultima_mano, prese_ns, prese_eo, carte_giocate, giocatore):
+    if level == "easy":
+        return turno_ai_easy(mano, tavolo, ultima_mano)
+    if level == "hard":
+        return turno_ai_hard(mano, tavolo, ultima_mano, prese_ns, prese_eo, carte_giocate, giocatore)
+    return turno_ai_medium(mano, tavolo, ultima_mano, prese_ns, prese_eo, carte_giocate)
+
+
+def run_game_loop(target_points: int = 21, ai_levels: dict | None = None):
     """Loop principale del gioco, eseguito in un thread separato."""
     punteggio_ns = 0
     punteggio_eo = 0
@@ -82,6 +91,7 @@ def run_game_loop(target_points: int = 21):
     total_prese_eo: list = []
     total_scope_ns = 0
     total_scope_eo = 0
+    ai_levels = ai_levels or {g: "medium" for g in ("Est", "Nord", "Ovest")}
 
     while True:
         mazzo = crea_mazzo()
@@ -141,7 +151,11 @@ def run_game_loop(target_points: int = 21):
             else:
                 # Turno AI: ritardo 5 secondi poi gioca
                 time.sleep(AI_DELAY_SEC)
-                carta, cattura = turno_ai(mano, tavolo, ultima_mano=ultima_giocata_mano)
+                level = ai_levels.get(giocatore, "medium")
+                carta, cattura = _ai_move(
+                    level, mano, tavolo, ultima_giocata_mano,
+                    prese_ns, prese_eo, carte_giocate, giocatore,
+                )
 
             socketio.emit("play", {
                 "player": giocatore,
@@ -244,17 +258,21 @@ def handle_connect():
 @socketio.on("start_game")
 def handle_start(data=None):
     target = 21
-    if data and "target_points" in data:
-        try:
-            target = int(data["target_points"])
-            if target < 1:
-                target = 1
-            if target > 101:
-                target = 101
-        except (ValueError, TypeError):
-            pass
+    ai_levels = {"Est": "medium", "Nord": "medium", "Ovest": "medium"}
+    if data:
+        if "target_points" in data:
+            try:
+                target = int(data["target_points"])
+                if target < 1:
+                    target = 1
+                if target > 101:
+                    target = 101
+            except (ValueError, TypeError):
+                pass
+        if "ai_levels" in data and isinstance(data["ai_levels"], dict):
+            ai_levels.update(data["ai_levels"])
     emit("state", {"message": "Avvio partita..."})
-    Thread(target=run_game_loop, kwargs={"target_points": target}, daemon=True).start()
+    Thread(target=run_game_loop, kwargs={"target_points": target, "ai_levels": ai_levels}, daemon=True).start()
 
 
 @socketio.on("play_card")
