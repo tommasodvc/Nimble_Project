@@ -105,8 +105,15 @@ def _valuta_throw(carta: Carta, tavolo: list[Carta]) -> float:
     """
     Quanto è bene gettare questa carta (più alto = meglio gettare).
     Preferisce: bassa primiera, non-Ori, carte che non creano facili catture.
+    Non si gettano 1, 2, 3 (soprattutto Ori) per non facilitare la napula all'avversario.
     """
     score = 0.0
+    # NON si esce di 1, 2 o 3: penalizza pesantemente (rischio napula all'avversario)
+    if carta.valore in (1, 2, 3):
+        if carta.seme == "Ori":
+            score -= 30
+        else:
+            score -= 15
     # Tieni 7, 6, Asso (alta primiera); getta Fante, Donna, Re, 2-5
     score += 22 - carta.valore_primiera
     # Proteggi Ori (per Ori + Napula)
@@ -152,6 +159,16 @@ def turno_ai_easy(
     return best[0], best[1]
 
 
+def _lascia_scopa_all_avversario(tavolo_dopo: list[Carta], ultima_mano: bool) -> bool:
+    """True se il tavolo dopo la nostra cattura permette all'avversario di fare scopa."""
+    if ultima_mano or not tavolo_dopo:
+        return False
+    if len(tavolo_dopo) == 1:
+        return True  # avversario può fare match diretto
+    somma = sum(c.valore for c in tavolo_dopo)
+    return 1 <= somma <= 10  # avversario può avere carta che cattura per somma
+
+
 def turno_ai_medium(
     mano: list[Carta],
     tavolo: list[Carta],
@@ -162,6 +179,7 @@ def turno_ai_medium(
 ) -> tuple[Carta, list[Carta] | None]:
     """
     Medium: come Easy + Napula, awareness fine mano, catture difensive.
+    Non getta 1,2,3 (rischio napula). Non fa catture che lasciano scopa all'avversario.
     """
     prese_ns = prese_ns or []
     prese_eo = prese_eo or []
@@ -173,6 +191,14 @@ def turno_ai_medium(
     if not mosse_con_cattura:
         best = max(mano, key=lambda c: _valuta_throw(c, tavolo))
         return best, None
+
+    # Filtra catture che lasciano scopa all'avversario (non si prende se si lascia scopa)
+    mosse_ok = [
+        (c, cat) for c, cat in mosse_con_cattura
+        if not _lascia_scopa_all_avversario([x for x in tavolo if x not in cat], ultima_mano)
+    ]
+    if not mosse_ok:
+        mosse_ok = mosse_con_cattura  # fallback: tutte le mosse se nessuna è sicura
 
     def valuta(c: Carta, cattura: list[Carta]) -> tuple[int, int, int, int]:
         scopa = 1 if (not ultima_mano and len(cattura) == len(tavolo)) else 0
@@ -189,7 +215,7 @@ def turno_ai_medium(
         carte_awareness = 1 if carte_giocate > 30 and (len(prese_ns) + len(prese_eo) + len(tavolo)) > 30 else 0
         return (scopa, primiera, ori + napula_bonus, carte_awareness)
 
-    best = max(mosse_con_cattura, key=lambda m: valuta(m[0], m[1]))
+    best = max(mosse_ok, key=lambda m: valuta(m[0], m[1]))
     return best[0], best[1]
 
 
@@ -214,7 +240,8 @@ def turno_ai_hard(
     debug_log: list | None = None,
 ) -> tuple[Carta, list[Carta] | None, str | None]:
     """
-    Hard: chiama LLM API (OpenAI) per la mossa. Ritorna (carta, cattura, spiegazione).
+    Hard: chiama LLM locale (Ollama) per la mossa. Ritorna (carta, cattura, spiegazione).
+    Richiede Ollama in esecuzione: ollama pull llama3.2 (o altro modello).
     Fallback a medium se errore → (carta, cattura, None).
     Se debug_log è fornito, vi appende {giocatore, turno, input, success, output, error}.
     """
@@ -234,11 +261,9 @@ def turno_ai_hard(
         import os
         import json
         from openai import OpenAI
-        client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""))
-        if not client.api_key:
-            c, k = turno_ai_medium(mano, tavolo, ultima_mano, prese_ns, prese_eo, carte_giocate)
-            _log(carte_giocate + 1, {}, False, None, None, "OPENAI_API_KEY non impostata")
-            return c, k, None
+        base_url = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434/v1")
+        model = os.environ.get("OLLAMA_MODEL", "llama3.2")
+        client = OpenAI(api_key="ollama", base_url=base_url)
 
         # Struttura input: carte in tavola, carte già uscite per turno (chi ha giocato cosa), mano propria
         carte_giocate_per_turno = [
@@ -265,7 +290,7 @@ Esempio: "spiegazione": "Riga1: motivo.\\nRiga2: dettaglio.\\nRiga3: obiettivo."
 Rispondi SOLO con JSON valido: {{"carta": {{"seme":"...","valore":N}}, "cattura": [...] o null, "spiegazione": "riga1\\nriga2\\nriga3"}}"""
 
         resp = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=model,
             messages=[{"role": "user", "content": prompt}],
             max_tokens=350,
         )
