@@ -245,11 +245,13 @@ def turno_ai_hard(
     Fallback a medium se errore → (carta, cattura, None).
     Se debug_log è fornito, vi appende {giocatore, turno, input, success, output, error}.
     """
-    def _log(turno: int, inp: dict, ok: bool, out_raw: str | None, out_parsed: dict | None, err: str | None):
+    def _log(turno: int, inp: dict, ok: bool, out_raw: str | None, out_parsed: dict | None, err: str | None, provider: str = "ollama", model_used: str = ""):
         if debug_log is not None:
             debug_log.append({
                 "giocatore": giocatore,
                 "turno": turno,
+                "provider": provider,
+                "model": model_used,
                 "input": inp,
                 "success": ok,
                 "output_raw": out_raw,
@@ -264,6 +266,7 @@ def turno_ai_hard(
         base_url = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434/v1")
         model = os.environ.get("OLLAMA_MODEL", "llama3.2")
         client = OpenAI(api_key="ollama", base_url=base_url)
+        provider, model_used = "ollama", model
 
         # Struttura input: carte in tavola, carte già uscite per turno (chi ha giocato cosa), mano propria
         carte_giocate_per_turno = [
@@ -304,7 +307,7 @@ Rispondi SOLO con JSON valido: {{"carta": {{"seme":"...","valore":N}}, "cattura"
         carta = next((c for c in mano if c.seme == cd.get("seme") and c.valore == cd.get("valore")), None)
         if not carta:
             c, k = turno_ai_medium(mano, tavolo, ultima_mano, prese_ns, prese_eo, carte_giocate)
-            _log(carte_giocate + 1, state, False, text, data, "Carta restituita dall'LLM non valida")
+            _log(carte_giocate + 1, state, False, text, data, "Carta restituita dall'LLM non valida", provider, model_used)
             return c, k, None
         opts = catture_valide(carta, tavolo)
         cattura = None
@@ -330,14 +333,17 @@ Rispondi SOLO con JSON valido: {{"carta": {{"seme":"...","valore":N}}, "cattura"
             else:
                 spiegazione = f"Gioco {nome} di {carta.seme} sul tavolo.\nNessuna cattura possibile; lascio la carta in gioco."
             spiegazione = spiegazione.strip()
-        _log(carte_giocate + 1, state, True, text, data, None)
+        _log(carte_giocate + 1, state, True, text, data, None, provider, model_used)
         return carta, cattura, spiegazione
     except Exception as e:
         try:
             st = state
         except NameError:
             st = {"error": "eccezione prima della costruzione state"}
-        _log(carte_giocate + 1, st, False, None, None, str(e))
+        try:
+            _log(carte_giocate + 1, st, False, None, None, str(e), provider, model_used)
+        except NameError:
+            _log(carte_giocate + 1, st, False, None, None, str(e), "ollama", "")
         c, k = turno_ai_medium(mano, tavolo, ultima_mano, prese_ns, prese_eo, carte_giocate)
         return c, k, None
 

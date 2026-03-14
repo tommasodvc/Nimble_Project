@@ -560,7 +560,7 @@
         dl.className = 'recap-section';
         const btn = document.createElement('button');
         btn.className = 'btn';
-        btn.textContent = 'Scarica debug log AI (OpenAI)';
+        btn.textContent = 'Scarica debug log AI (Ollama/LLM)';
         btn.onclick = () => {
           const blob = new Blob([JSON.stringify(data.ai_debug_log, null, 2)], { type: 'application/json' });
           const a = document.createElement('a');
