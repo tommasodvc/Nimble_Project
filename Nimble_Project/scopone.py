@@ -210,11 +210,26 @@ def turno_ai_hard(
     prese_eo: list | None = None,
     carte_giocate: int = 0,
     giocatore: str = "",
+    play_history: list | None = None,
+    debug_log: list | None = None,
 ) -> tuple[Carta, list[Carta] | None, str | None]:
     """
     Hard: chiama LLM API (OpenAI) per la mossa. Ritorna (carta, cattura, spiegazione).
     Fallback a medium se errore → (carta, cattura, None).
+    Se debug_log è fornito, vi appende {giocatore, turno, input, success, output, error}.
     """
+    def _log(turno: int, inp: dict, ok: bool, out_raw: str | None, out_parsed: dict | None, err: str | None):
+        if debug_log is not None:
+            debug_log.append({
+                "giocatore": giocatore,
+                "turno": turno,
+                "input": inp,
+                "success": ok,
+                "output_raw": out_raw,
+                "output_parsed": out_parsed,
+                "error": err,
+            })
+
     try:
         import os
         import json
@@ -222,16 +237,27 @@ def turno_ai_hard(
         client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""))
         if not client.api_key:
             c, k = turno_ai_medium(mano, tavolo, ultima_mano, prese_ns, prese_eo, carte_giocate)
+            _log(carte_giocate + 1, {}, False, None, None, "OPENAI_API_KEY non impostata")
             return c, k, None
 
+        # Struttura input: carte in tavola, carte già uscite per turno (chi ha giocato cosa), mano propria
+        carte_giocate_per_turno = [
+            {"turno": i + 1, "giocatore": h["giocatore"], "carta": {"seme": h["seme"], "valore": h["valore"]}}
+            for i, h in enumerate(play_history or [])
+        ]
         state = {
-            "mano": [_carta_repr(c) for c in mano],
-            "tavolo": [_carta_repr(c) for c in tavolo],
+            "carte_in_tavola": [_carta_repr(c) for c in tavolo],
+            "carte_giocate_per_turno": carte_giocate_per_turno,
+            "mano_propria": [_carta_repr(c) for c in mano],
             "prese_ns": len(prese_ns or []),
             "prese_eo": len(prese_eo or []),
             "giocatore": giocatore,
+            "ultima_mano": ultima_mano,
+            "carte_giocate": carte_giocate,
         }
-        prompt = f"""Sei un esperto di Scopone Scientifico. Stato: {json.dumps(state)}.
+        prompt = f"""Sei un esperto di Scopone Scientifico. Stato attuale (strutturato):
+{json.dumps(state, ensure_ascii=False, indent=2)}
+
 Regole: 1) Match diretto obbligatorio (stesso valore). 2) Senza match diretto, somma valori.
 Devi giocare UNA carta da mano. Se può catturare, indica quali carte del tavolo (o null).
 OBBLIGATORIO: includi sempre "spiegazione" con esattamente 3 righe in italiano (separate da \\n) che spiegano la mossa.
@@ -253,6 +279,7 @@ Rispondi SOLO con JSON valido: {{"carta": {{"seme":"...","valore":N}}, "cattura"
         carta = next((c for c in mano if c.seme == cd.get("seme") and c.valore == cd.get("valore")), None)
         if not carta:
             c, k = turno_ai_medium(mano, tavolo, ultima_mano, prese_ns, prese_eo, carte_giocate)
+            _log(carte_giocate + 1, state, False, text, data, "Carta restituita dall'LLM non valida")
             return c, k, None
         opts = catture_valide(carta, tavolo)
         cattura = None
@@ -278,8 +305,14 @@ Rispondi SOLO con JSON valido: {{"carta": {{"seme":"...","valore":N}}, "cattura"
             else:
                 spiegazione = f"Gioco {nome} di {carta.seme} sul tavolo.\nNessuna cattura possibile; lascio la carta in gioco."
             spiegazione = spiegazione.strip()
+        _log(carte_giocate + 1, state, True, text, data, None)
         return carta, cattura, spiegazione
-    except Exception:
+    except Exception as e:
+        try:
+            st = state
+        except NameError:
+            st = {"error": "eccezione prima della costruzione state"}
+        _log(carte_giocate + 1, st, False, None, None, str(e))
         c, k = turno_ai_medium(mano, tavolo, ultima_mano, prese_ns, prese_eo, carte_giocate)
         return c, k, None
 

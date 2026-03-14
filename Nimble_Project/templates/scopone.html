@@ -555,6 +555,23 @@
       wrap.appendChild(s1);
       wrap.appendChild(s2);
       wrap.appendChild(s3);
+      if (data.ai_debug_log && data.ai_debug_log.length > 0) {
+        const dl = document.createElement('div');
+        dl.className = 'recap-section';
+        const btn = document.createElement('button');
+        btn.className = 'btn';
+        btn.textContent = 'Scarica debug log AI (OpenAI)';
+        btn.onclick = () => {
+          const blob = new Blob([JSON.stringify(data.ai_debug_log, null, 2)], { type: 'application/json' });
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = 'scopone-ai-debug-' + new Date().toISOString().slice(0,10) + '.json';
+          a.click();
+          URL.revokeObjectURL(a.href);
+        };
+        dl.appendChild(btn);
+        wrap.appendChild(dl);
+      }
       document.getElementById('recap-content').innerHTML = '';
       document.getElementById('recap-content').appendChild(wrap);
       document.getElementById('recap-title').textContent = winner === 'Pareggio' ? 'Pareggio!' : winner + ' vince!';

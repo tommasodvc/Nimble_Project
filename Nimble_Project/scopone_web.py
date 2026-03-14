@@ -80,11 +80,13 @@ def _primiera_detail(prese: list) -> dict:
     return detail
 
 
-def _ai_move(level: str, mano, tavolo, ultima_mano, prese_ns, prese_eo, carte_giocate, giocatore):
+def _ai_move(level: str, mano, tavolo, ultima_mano, prese_ns, prese_eo, carte_giocate, giocatore,
+             play_history=None, debug_log=None):
     if level == "easy":
         return turno_ai_easy(mano, tavolo, ultima_mano)
     if level == "hard":
-        return turno_ai_hard(mano, tavolo, ultima_mano, prese_ns, prese_eo, carte_giocate, giocatore)
+        return turno_ai_hard(mano, tavolo, ultima_mano, prese_ns, prese_eo, carte_giocate, giocatore,
+                            play_history=play_history, debug_log=debug_log)
     return turno_ai_medium(mano, tavolo, ultima_mano, prese_ns, prese_eo, carte_giocate)
 
 
@@ -103,6 +105,7 @@ def run_game_loop(target_points: int = 21, ai_levels: dict | None = None, carte_
     total_pt_prim_ns = total_pt_prim_eo = 0
     total_pt_nap_ns = total_pt_nap_eo = 0
     ai_levels = ai_levels or {g: "medium" for g in ("Est", "Nord", "Ovest")}
+    ai_debug_log: list = []  # log chiamate OpenAI per download a fine partita
 
     while True:
         mazzo = crea_mazzo()
@@ -173,6 +176,7 @@ def run_game_loop(target_points: int = 21, ai_levels: dict | None = None, carte_
                 res = _ai_move(
                     level, mano, tavolo, ultima_giocata_mano,
                     prese_ns, prese_eo, carte_giocate, giocatore,
+                    play_history=play_history, debug_log=ai_debug_log,
                 )
                 carta, cattura = res[0], res[1]
                 if len(res) >= 3:
@@ -251,6 +255,7 @@ def run_game_loop(target_points: int = 21, ai_levels: dict | None = None, carte_
             prim2 = _primiera_detail(total_prese_eo)
             recap = {
                 "winner": winner,
+                "ai_debug_log": ai_debug_log,
                 "punteggio_ns": punteggio_ns,
                 "punteggio_eo": punteggio_eo,
                 "team1_cards": [carta_to_dict(c) for c in prese_ns],
