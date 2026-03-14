@@ -264,7 +264,7 @@ def turno_ai_hard(
         import json
         from openai import OpenAI
         base_url = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434/v1")
-        model = os.environ.get("OLLAMA_MODEL", "llama3.2")
+        model = os.environ.get("OLLAMA_MODEL", "mistral")
         client = OpenAI(api_key="ollama", base_url=base_url)
         provider, model_used = "ollama", model
 
