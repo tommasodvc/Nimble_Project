@@ -4,6 +4,8 @@ Scopone Scientifico - Web UI interattiva
 Apri http://localhost:5000 nel browser. Clicca sulle tue carte per giocare.
 I turni degli AI sono mostrati con un ritardo di 5 secondi.
 """
+from dotenv import load_dotenv
+load_dotenv()
 
 import random
 import time
